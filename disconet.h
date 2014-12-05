@@ -1,14 +1,8 @@
 #define DISCONET
-#include <ncurses.h>
+
 #include <cstdlib>
-#include <ctime>
-#include <unistd.h>
-
-#include <iostream>
-#include <sstream>
 #include <string>
-#include <math.h>
-
+const int DATA_UNKNOWN = -1;
 
 void loop(std::string chosen_interface, double xmultiplier, double ymultiplier);
 
@@ -40,3 +34,5 @@ struct net_state {
 #else
 #include "bsd.h"
 #endif
+
+#include "drawing.h"
