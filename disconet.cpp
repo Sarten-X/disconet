@@ -2,35 +2,7 @@
 *   Copyright (C) 2007 by Sarten-X   *
 \************************************/
 
-#include <ncurses.h>
-#include <cstdlib>
-#include <ctime>
-#include <unistd.h>
-
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <math.h>
-
-#ifdef linux
-#include <fstream>
-#else
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <net/if.h>
-#include <net/if_dl.h>
-#include <net/route.h>
-#include <sys/param.h>
-#include <sys/sysctl.h>
-
-unsigned long long* get_BSD_stats(unsigned long long* buffer, const char* interface);
-#endif
-
-using namespace std;
+#include "disconet.h"
 
 const int MIN_HEIGHT = 2;
 const int MIN_WIDTH = 2;
@@ -56,50 +28,15 @@ void fill_rect(int y, int x, int w, int h)
     mvhline(y+n, x, ' ', w);
 }
 
-struct net_state {
-  size_t rcvbytes;
-  size_t rcvpackets;
-  size_t rcverrs;
-  size_t rcvdrop;
-  size_t rcvfifo;
-  size_t rcvframe;
-  size_t rcvcompressed;
-  size_t rcvmulticast;
 
-  size_t xmtbytes;
-  size_t xmtpackets;
-  size_t xmterrs;
-  size_t xmtdrop;
-  size_t xmtfifo;
-  size_t xmtcolls;
-  size_t xmtcarrier;
-  size_t xmtcompressed;
-};
 
 int main(int argc, char* argv[])
 {
-  // Declare variables for the position of the tiles.
-  int startx, starty, height, width, color, h, w;
-
-  // Declare space for the number of tiles and storing old traffic calculation.
-  long long number = -1;
-  unsigned long long oldtraffic = 0;
-
-  // Declare placeholders for all the fields in /proc/net/dev. I wallow in wasted RAM.
-  net_state current, old;
-
   // Declare space and defaults for the scaling multiplier parameters.
   double xmultiplier = 1,ymultiplier = 1;
 
   // Declare space for the interface parameter.
   std::string chosen_interface;
-
-#ifdef linux
-  // Declare a file stream, for reading /proc/net/dev.
-  fstream filestr;
-#endif
-
-  // Begin the main program
 
   // If a dumb number of parameters was supplied, print the usage message and exit.
   if(!(argc == 2 || argc == 4)) {
@@ -115,6 +52,18 @@ int main(int argc, char* argv[])
     }
   }
 
+  std::cout << "Finding network interface" << std::endl;
+  // Attempt to get network statistics
+  net_state interface_test = get_network_state(chosen_interface);
+
+  // Couldn't find the interface, exit "gracefully"
+  if (interface_test.error) {
+    endwin();
+    std::cerr << "Failed to find interface \"" << chosen_interface << "\"" << std::endl;
+    return -1;
+  }
+
+  std::cout << "Initializing ncurses" << std::endl;
   // Start the ncurses control of the screen. Since only one window is used, it will take the whole screen.
   initscr();
 
@@ -136,70 +85,33 @@ int main(int argc, char* argv[])
   init_pair(5, COLOR_BLUE, COLOR_BLUE);
   init_pair(6, COLOR_MAGENTA, COLOR_MAGENTA);
   init_pair(7, COLOR_BLACK, COLOR_BLACK);
-  int colors = 8;
 
   // All configuration is done.
+  std::cout << "Starting monitoring" << std::endl;
+  loop(chosen_interface, xmultiplier, ymultiplier);
+  getch();
 
-  /*
+  endwin();
+  return 0;
+}
 
-  	***** SAMPLE /proc/net/dev FILE FROM MY SERVER *****
+void loop (std::string chosen_interface, double xmultiplier, double ymultiplier) {
+  int colors = 8;
+  // Declare variables for the position of the tiles.
+  int startx, starty, height, width, color, h, w;
 
-  Inter-|   Receive                                                |  Transmit
-   face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
-      lo:  989831   18734    0    0    0     0          0         0   989831   18734    0    0    0     0       0          0
-    eth0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
-    eth1:11933421   88557    0    0    0     0          0         0 43125253  104076    0    0    0     0       0          0
+  // Declare space for the number of tiles and storing old traffic calculation.
+  long long number = -1;
+  unsigned long long oldtraffic = 0;
 
-
-  */
+  // Declare placeholders for all the fields in /proc/net/dev. I wallow in wasted RAM.
+  net_state current, old;
 
   // Start main loop. This should have some kind of exit.
   while (1) {
     // Save a copy of old data, for calculating change.
     old = current;
-
-#ifdef linux
-    // Open the file /proc/net/dev for input.
-    filestr.open ("/proc/net/dev", fstream::in);
-    std::string header;
-    // First two lines are table headers, skip those
-    getline(filestr, header);
-    getline(filestr, header);
-
-    // Loop through each line of the file until we find the correct interface.
-    while(filestr) {
-      std::string interface;
-      getline(filestr, interface, ':');
-      if(interface == chosen_interface) break;
-      else getline(filestr, interface);   // skip rest of the line
-    }
-
-    // Couldn't find the interface, exit "gracefully"
-    if(!filestr) {
-      endwin();
-      std::cerr << "Failed to find interface" << std::endl;
-      return -1;
-    }
-
-    // Load the new data from the stream into the variables
-    filestr >>current.rcvbytes>>current.rcvpackets>>current.rcverrs>>current.rcvdrop>>current.rcvfifo>>current.rcvframe>>current.rcvcompressed>>current.rcvmulticast;
-    filestr >>current.xmtbytes>>current.xmtpackets>>current.xmterrs>>current.xmtdrop>>current.xmtfifo>>current.xmtcolls>>current.xmtcarrier>>current.xmtcompressed;
-
-    // Having found the interface, close the file stream.
-    filestr.close();
-
-#else
-    {
-
-      unsigned long long * stats = new unsigned long long[4];
-      get_BSD_stats(stats, chosen_interface);
-      current.rcvbytes = stats[0];
-      current.rcvpackets = stats[1];
-      current.xmtbytes = stats[2];
-      current.xmtpackets = stats[3];
-      delete[] stats;
-    }
-#endif
+    current = get_network_state(chosen_interface);
 
     // Begin calculations
 
@@ -240,8 +152,8 @@ int main(int argc, char* argv[])
       //height = MIN_HEIGHT;
       //width = MIN_WIDTH;
 
-      height = 1 * max(MIN_HEIGHT,(int)round(ymultiplier * MIN_HEIGHT/min(MIN_HEIGHT,MIN_WIDTH)*h/256));
-      width = 2 * max(MIN_WIDTH, (int)round(xmultiplier * MIN_WIDTH/min(MIN_HEIGHT,MIN_WIDTH)*w/256));
+      height = 1 * std::max(MIN_HEIGHT,(int)round(ymultiplier * MIN_HEIGHT/std::min(MIN_HEIGHT,MIN_WIDTH)*h/256));
+      width = 2 * std::max(MIN_WIDTH, (int)round(xmultiplier * MIN_WIDTH/std::min(MIN_HEIGHT,MIN_WIDTH)*w/256));
 
       attron(COLOR_PAIR(color));
 
@@ -258,71 +170,4 @@ int main(int argc, char* argv[])
     usleep(100000);	// Wait for next interval
     refresh();
   }
-
-  getch();
-
-  endwin();
-  return 0;
 }
-
-#ifndef linux
-unsigned long long* get_BSD_stats(unsigned long long* out, const char* interface)
-{
-  // Based on someone else's code. I have no idea how it works.
-  int mib[6] = { CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST, 0 };
-  size_t len;
-  char *buf, *next, *lim;
-  struct if_data *ifd;
-  struct rt_msghdr *rtm;
-  struct sockaddr_dl *sdl;
-
-  /* this magically tells us how much space we need */
-  if( -1 == sysctl(mib, 6, NULL, &len, NULL, 0) ) {
-    perror("sysctl");
-    exit(1);
-  }
-
-  buf = (char *)malloc(len);
-  if( NULL == buf ) {
-    perror("malloc");
-    exit(1);
-  }
-
-  if( -1 == sysctl(mib, 6, buf, &len, NULL, 0) ) {
-    perror("sysctl");
-    exit(1);
-  }
-
-  lim = buf + len;
-  for(next = buf; next < lim; next += rtm->rtm_msglen) {
-    rtm = (struct rt_msghdr *)next;
-    if( RTM_VERSION == rtm->rtm_version &&
-        RTM_IFINFO == rtm->rtm_type) {
-      ifd = &((struct if_msghdr *)next)->ifm_data;
-
-      /* dont ask, dont tell */
-      sdl = (struct sockaddr_dl *)
-            (next + sizeof(struct rt_msghdr) + 2 * sizeof(struct sockaddr));
-
-      if( NULL == sdl || AF_LINK != sdl->sdl_family ) {
-        continue;
-      }
-      if( 0 != strncmp(sdl->sdl_data, interface, sdl->sdl_nlen) ) {
-        continue;
-      }
-
-      /* i don't think sdl->sdl_data is guaranteed to be null terminated */
-      /*printf("%s %10lu %10lu %10lu %10lu\n", sdl->sdl_data,
-      	ifd->ifi_ibytes, ifd->ifi_ipackets,
-      	ifd->ifi_obytes, ifd->ifi_opackets);*/
-      out[0] = ifd->ifi_ibytes;
-      out[1] = ifd->ifi_ipackets;
-      out[2] = ifd->ifi_obytes;
-      out[3] = ifd->ifi_opackets;
-    }
-  }
-
-  free(buf);
-  return out;
-}
-#endif
