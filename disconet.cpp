@@ -10,12 +10,11 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <string.h>
+#include <math.h>
 
 #ifdef linux
 	#include <fstream>
-#endif
-#ifndef linux
+#else
 	#include <errno.h>
 	#include <stdio.h>
 	#include <stdlib.h>
@@ -31,17 +30,10 @@
 	unsigned long long* get_BSD_stats(unsigned long long* buffer, const char* interface);
 #endif
 
+using namespace std;
+
 const int MIN_HEIGHT = 2;
 const int MIN_WIDTH = 2;
-
-// Some simple functions.
-int min(int a,int b) { return a<b?a:b; }
-int max(int a,int b) { return a>b?a:b; }
-int min(int a,double b) { return a<b?a:(int)b; }
-int max(int a,double b) { return a>b?a:(int)b; }
-#ifdef linux
-	int round(double a) { return (int)(a+.5); }
-#endif
 
 // Function for creating an open box.
 void create_box(int y, int x, int w, int h)
@@ -64,6 +56,26 @@ void fill_rect(int y, int x, int w, int h)
 		mvhline(y+n, x, ' ', w);
 }
 
+struct net_state {
+  size_t rcvbytes;
+  size_t rcvpackets;
+  size_t rcverrs;
+  size_t rcvdrop;
+  size_t rcvfifo;
+  size_t rcvframe;
+  size_t rcvcompressed;
+  size_t rcvmulticast;
+
+  size_t xmtbytes;
+  size_t xmtpackets;
+  size_t xmterrs;
+  size_t xmtdrop;
+  size_t xmtfifo;
+  size_t xmtcolls;
+  size_t xmtcarrier;
+  size_t xmtcompressed;
+};
+
 int main(int argc, char* argv[])
 {
 	// Declare variables for the position of the tiles.
@@ -74,18 +86,13 @@ int main(int argc, char* argv[])
 	unsigned long long oldtraffic = 0;
 
 	// Declare placeholders for all the fields in /proc/net/dev. I wallow in wasted RAM.
-	unsigned long long rcvbytes=0,rcvpackets=0,rcverrs=0,rcvdrop=0,rcvfifo=0,rcvframe=0,rcvcompressed=0,rcvmulticast=0;
-	unsigned long long xmtbytes=0,xmtpackets=0,xmterrs=0,xmtdrop=0,xmtfifo=0,xmtcolls=0,xmtcarrier=0,xmtcompressed=0;
-
-	// Declare space for the old values in /proc/net/dev, for change calculations.
-	unsigned long long orcvbytes=0,orcvpackets=0,orcverrs=0,orcvdrop=0,orcvfifo=0,orcvframe=0,orcvcompressed=0,orcvmulticast=0;
-	unsigned long long oxmtbytes=0,oxmtpackets=0,oxmterrs=0,oxmtdrop=0,oxmtfifo=0,oxmtcolls=0,oxmtcarrier=0,oxmtcompressed=0;
+  net_state current, old;
 
 	// Declare space and defaults for the scaling multiplier parameters.
 	double xmultiplier = 1,ymultiplier = 1;
 
 	// Declare space for the interface parameter.
-	char* chosen_interface;
+	std::string chosen_interface;
 
 	#ifdef linux
 		// Declare a file stream, for reading /proc/net/dev.
@@ -95,7 +102,7 @@ int main(int argc, char* argv[])
 	// Begin the main program
 
 	// If a dumb number of parameters was supplied, print the usage message and exit.
-	if(argc==1 || argc == 3 || argc > 4) {
+	if(!(argc == 2 || argc == 4)) {
 		fprintf(stderr, "Usage: %s <interface> [xmultiplier ymultiplier]\n", argv[0]);
 		exit(1);
 	}
@@ -150,107 +157,55 @@ Inter-|   Receive                                                |  Transmit
 	// Start main loop. This should have some kind of exit.
 	while (1) {
 		// Save a copy of old data, for calculating change.
-		orcvbytes=rcvbytes;
-		orcvpackets=rcvpackets;
-		orcverrs=rcverrs;
-		orcvdrop=rcvdrop;
-		orcvfifo=rcvfifo;
-		orcvframe=rcvframe;
-		orcvcompressed=rcvcompressed;
-		orcvmulticast=rcvmulticast;
-
-		oxmtbytes=xmtbytes;
-		oxmtpackets=xmtpackets;
-		oxmterrs=xmterrs;
-		oxmtdrop=xmtdrop;
-		oxmtfifo=xmtfifo;
-		oxmtcolls=xmtcolls;
-		oxmtcarrier=xmtcarrier;
-		oxmtcompressed=xmtcompressed;
+    old = current;
 
 		#ifdef linux
 			// Open the file /proc/net/dev for input.
 			filestr.open ("/proc/net/dev", fstream::in);
-
-			// Declare space for a temporary copy of the full line currently being read.
-			char* line = new char[256];
-			// Declare space for a temporary copy of the interface of the line being read.
-			char* interface = new char[10];
-
-			// Declare number of spaces trimmed off the interface.
-			int trim = 0;
+      std::string header;
+      // First two lines are table headers, skip those
+      getline(filestr, header);
+      getline(filestr, header);
 
 			// Loop through each line of the file until we find the correct interface.
-			// If a non-existant interface is sought, this will loop infinitely.
-			do {
-				// Get the next line from the stream.
-				filestr.getline(line,256);
-	
-				// Initialize position variables.
-				// "n" is the reading position in "line".
-				int n = 0;
-				// "trim" is the number of skipped spaces.
-				trim = 0;
-	
-				// Loop through each character in the line, until running out of space, or reaching the end
-				// of the first field (the interface name).
-				while (line[n] != 0 && n<10 && line[n] != ':' && line[n] != '|') {
-	
-					// Since the interfaces are right-justified, we need to trim off the leading spaces.
-					// We do this by skipping the spaces, and copying what's left to "interface".
-					if (line[n] == ' ') {
-						trim++;
-					} else {
-						interface[n-trim] = line[n];
-						interface[n-trim+1] = 0;
-					}
-					n++;
-				}
-				// To make things nicer to handle, we redefine trim to cut off the already-read part of
-				// the line, effectively saying we'll cut off the interface label.
-				// Note that this gets reset above if the loop does not yet terminate.
-				trim = n;
-	
-				// Continue reading the file until the sought interface is found.
-			} while (strcmp(interface,chosen_interface) != 0);
+      while(filestr) {
+        std::string interface;
+        getline(filestr, interface, ':');
+        if(interface == chosen_interface) break;
+        else getline(filestr, interface);   // skip rest of the line
+      }
+
+      // Couldn't find the interface, exit "gracefully"
+      if(!filestr) {
+        endwin();
+        std::cerr << "Failed to find interface" << std::endl;
+        return -1;
+      }
+
+			// Load the new data from the stream into the variables
+			filestr >>current.rcvbytes>>current.rcvpackets>>current.rcverrs>>current.rcvdrop>>current.rcvfifo>>current.rcvframe>>current.rcvcompressed>>current.rcvmulticast;
+			filestr >>current.xmtbytes>>current.xmtpackets>>current.xmterrs>>current.xmtdrop>>current.xmtfifo>>current.xmtcolls>>current.xmtcarrier>>current.xmtcompressed;
 
 			// Having found the interface, close the file stream.
 			filestr.close();
-
-			// Line now contains the complete line of the sought interface's statistics
-		
-			// Load the line into a C++ string object. Note the pointer math to trim the interface label off
-			// the line.
-			string fullline = (line + trim+1);
-	
-			// Make a stream to allow easy parsing of the data line.
-			istringstream iss (fullline,istringstream::in);
-	
-			// Load the new data from the stream into the variables
-			iss >>rcvbytes>>rcvpackets>>rcverrs>>rcvdrop>>rcvfifo>>rcvframe>>rcvcompressed>>rcvmulticast;
-			iss >>xmtbytes>>xmtpackets>>xmterrs>>xmtdrop>>xmtfifo>>xmtcolls>>xmtcarrier>>xmtcompressed;
-			delete line;
-			delete interface;
 			
-		#endif
-		
-		#ifndef linux
+		#else
 			{
-				
-				unsigned long long * stats = new unsigned long long[4];
-				get_BSD_stats(stats, chosen_interface);
-				rcvbytes = stats[0];
-				rcvpackets = stats[1];
-				xmtbytes = stats[2];
-				xmtpackets = stats[3];
-				delete stats;
+			  
+			  unsigned long long * stats = new unsigned long long[4];
+			  get_BSD_stats(stats, chosen_interface);
+			  current.rcvbytes = stats[0];
+			  current.rcvpackets = stats[1];
+			  current.xmtbytes = stats[2];
+			  current.xmtpackets = stats[3];
+			  delete[] stats;
 			}
 		#endif
 
 		// Begin calculations
 
 		// Calculate number of tiles from data
-		unsigned long long traffic = (xmtbytes + rcvbytes) / (1024);
+		unsigned long long traffic = (current.xmtbytes + current.rcvbytes) / (1024);
 
 		// If this is the first cycle (denoted by "number" being -1), set "number" to 0.
 		// This will make the draw cycle not execute, but it will save the data for change calculations.
@@ -264,9 +219,9 @@ Inter-|   Receive                                                |  Transmit
 		//cout << number << "	" << xmtbytes << "	" << rcvbytes << "	" << traffic << endl;
 		// Calculate sizes
 		//std::cout << rcvbytes << "	" << rcvpackets << "	" << xmtbytes << "	" << xmtpackets << "	" << std::endl;
-		if (number > 0 && xmtpackets - oxmtpackets > 0 && rcvpackets - orcvpackets > 0) {
-			w = (xmtbytes-oxmtbytes)/(xmtpackets - oxmtpackets) ;	// Sent bytes per packet
-			h = (rcvbytes-orcvbytes)/(rcvpackets - orcvpackets) ;	// Received bytes per packet
+		if (number > 0 && current.xmtpackets - old.xmtpackets > 0 && current.rcvpackets - old.rcvpackets > 0) {
+			w = (current.xmtbytes-old.xmtbytes)/(current.xmtpackets - old.xmtpackets) ;	// Sent bytes per packet
+			h = (current.rcvbytes-old.rcvbytes)/(current.rcvpackets - old.rcvpackets) ;	// Received bytes per packet
 		} else {
 			w = 0;
 			h = 0;
@@ -286,8 +241,8 @@ Inter-|   Receive                                                |  Transmit
 			//height = MIN_HEIGHT;
 			//width = MIN_WIDTH;
 
-			height = 1 * max(MIN_HEIGHT,round(ymultiplier * MIN_HEIGHT/min(MIN_HEIGHT,MIN_WIDTH)*h/256));
-			width = 2 * max(MIN_WIDTH, round(xmultiplier * MIN_WIDTH/min(MIN_HEIGHT,MIN_WIDTH)*w/256));
+			height = 1 * max(MIN_HEIGHT,(int)round(ymultiplier * MIN_HEIGHT/min(MIN_HEIGHT,MIN_WIDTH)*h/256));
+			width = 2 * max(MIN_WIDTH, (int)round(xmultiplier * MIN_WIDTH/min(MIN_HEIGHT,MIN_WIDTH)*w/256));
 			
 			attron(COLOR_PAIR(color));
 			
