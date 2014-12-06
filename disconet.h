@@ -1,10 +1,10 @@
-#define DISCONET
+#pragma once
+#ifndef __DISCONET_H__
+#define __DISCONET_H__
 
 #include <cstdlib>
 #include <string>
 const int DATA_UNKNOWN = -1;
-
-void loop(std::string chosen_interface, double xmultiplier, double ymultiplier);
 
 struct net_state {
   size_t rcvbytes;
@@ -24,15 +24,8 @@ struct net_state {
   size_t xmtcolls;
   size_t xmtcarrier;
   size_t xmtcompressed;
-
-  bool error;
 };
 
+extern int get_network_state(const std::string& interface, net_state* state);
 
-#ifdef linux
-#include "linux.h"
-#else
-#include "bsd.h"
-#endif
-
-#include "drawing.h"
+#endif // __DISCONET_H__

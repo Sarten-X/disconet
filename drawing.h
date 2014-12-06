@@ -1,9 +1,13 @@
+#pragma once
+#ifndef __DISONETDRAWING_H__
+#define __DISONETDRAWING_H__
+
 void initialize_drawing();
 
 void uninitialize_drawing();
 
+void paint_drawing(const net_state& state, double xmultipler, double ymultipler);
+
 void refresh_drawing();
 
-void draw_block(int xmultiplier, int ymultiplier, int w, int h, int type);
-
-
+#endif // __DISONETDRAWING_H__

@@ -1,15 +1,18 @@
+#include "disconet.h"
+#include "drawing.h"
+
 #include <ncurses.h>
 
+#include <math.h>
 #include <cstdlib>
 #include <ctime>
 #include <unistd.h>
 #include <algorithm>
 
-
 const int MIN_HEIGHT = 2;
 const int MIN_WIDTH = 2;
 // Function for creating an open box.
-void create_box(int y, int x, int w, int h)
+static void create_box(int y, int x, int w, int h)
 {
   mvaddch(y, x, ' ');
   mvaddch(y, x + w, ' ');
@@ -22,7 +25,7 @@ void create_box(int y, int x, int w, int h)
 }
 
 // Function for creating a filled box.
-void fill_rect(int y, int x, int w, int h)
+static void fill_rect(int y, int x, int w, int h)
 {
   mvhline(y, x, ' ', w);
   for (int n = 1; n < h; n++)
@@ -54,7 +57,7 @@ void initialize_drawing() {
   init_pair(7, COLOR_BLACK, COLOR_BLACK);
 }
 
-void draw_block(int xmultiplier, int ymultiplier, int w, int h, int type) {
+static void draw_block(double xscale, double yscale, int w, int h, int type) {
   int colors = 8;
   // Declare variables for the position of the tiles.
   int startx, starty, height, width, color;
@@ -72,8 +75,8 @@ void draw_block(int xmultiplier, int ymultiplier, int w, int h, int type) {
   //height = MIN_HEIGHT;
   //width = MIN_WIDTH;
 
-  height = 1 * std::max(MIN_HEIGHT,(int)round(ymultiplier * MIN_HEIGHT/std::min(MIN_HEIGHT,MIN_WIDTH)*h/256));
-  width = 2 * std::max(MIN_WIDTH, (int)round(xmultiplier * MIN_WIDTH/std::min(MIN_HEIGHT,MIN_WIDTH)*w/256));
+  height = 1 * std::max(MIN_HEIGHT,(int)round(yscale * MIN_HEIGHT/std::min(MIN_HEIGHT,MIN_WIDTH)*h/256));
+  width = 2 * std::max(MIN_WIDTH, (int)round(xscale * MIN_WIDTH/std::min(MIN_HEIGHT,MIN_WIDTH)*w/256));
 
   attron(COLOR_PAIR(color));
 
@@ -86,6 +89,32 @@ void uninitialize_drawing() {
   getch();
 
   endwin();
+}
+
+void paint_drawing(const net_state& state, double xscale, double yscale) {
+  const size_t traffic = (state.xmtbytes + state.rcvbytes) / (1024);
+
+  static net_state oldstate = state;
+  static size_t oldtraffic = traffic;
+  static size_t number = traffic - oldtraffic;
+
+  size_t w=0, h=0;
+  const size_t xmt_diff = state.xmtpackets - oldstate.xmtpackets;
+  const size_t rcv_diff = state.rcvpackets - oldstate.rcvpackets;
+
+  if (number > 0 && xmt_diff > 0 && rcv_diff > 0) {
+    w = (state.xmtbytes-oldstate.xmtbytes)/ xmt_diff;	// Sent bytes per packet
+    h = (state.rcvbytes-oldstate.rcvbytes)/ rcv_diff;	// Received bytes per packet
+  }
+
+  // Draw the blocks
+  for(size_t i = 0; i < number; i++)
+    draw_block(xscale, yscale, w, h, DATA_UNKNOWN);
+
+  // Update internal state
+  oldstate = state;
+  number = traffic - oldtraffic;
+  oldtraffic = traffic;
 }
 
 void refresh_drawing() {

@@ -1,22 +1,21 @@
-#include "bsd.h"
-#ifndef linux
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+#include <net/route.h>
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#include "disconet.h"
 
-net_state get_network_state(std::string interface) {
-  net_state current;
-  {
-
-    unsigned long long * stats = new unsigned long long[4];
-    get_BSD_stats(stats, chosen_interface);
-    current.rcvbytes = stats[0];
-    current.rcvpackets = stats[1];
-    current.xmtbytes = stats[2];
-    current.xmtpackets = stats[3];
-    delete[] stats;
-  }
-  return current;
+int get_network_state(const std::string& interface, net_state* state) {
+  return get_BSD_stats(state, interface.c_str());
 }
 
-unsigned long long* get_BSD_stats(unsigned long long* out, const char* interface)
+static int get_BSD_stats(net_state* out, const char* interface)
 {
   // Based on someone else's code. I have no idea how it works.
   int mib[6] = { CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST, 0 };
@@ -29,18 +28,18 @@ unsigned long long* get_BSD_stats(unsigned long long* out, const char* interface
   /* this magically tells us how much space we need */
   if( -1 == sysctl(mib, 6, NULL, &len, NULL, 0) ) {
     perror("sysctl");
-    exit(1);
+    return -1;
   }
 
   buf = (char *)malloc(len);
   if( NULL == buf ) {
     perror("malloc");
-    exit(1);
+    return -1;
   }
 
   if( -1 == sysctl(mib, 6, buf, &len, NULL, 0) ) {
     perror("sysctl");
-    exit(1);
+    return -1;
   }
 
   lim = buf + len;
@@ -65,15 +64,16 @@ unsigned long long* get_BSD_stats(unsigned long long* out, const char* interface
       /*printf("%s %10lu %10lu %10lu %10lu\n", sdl->sdl_data,
       	ifd->ifi_ibytes, ifd->ifi_ipackets,
       	ifd->ifi_obytes, ifd->ifi_opackets);*/
-      out[0] = ifd->ifi_ibytes;
-      out[1] = ifd->ifi_ipackets;
-      out[2] = ifd->ifi_obytes;
-      out[3] = ifd->ifi_opackets;
+      if(out != NULL) {
+        out->rcvbytes = ifd->ifi_ibytes;
+        out->rcvpackets = ifd->ifi_ipackets;
+        out->xmtbytes = ifd->ifi_obytes;
+        out->xmtpackets = ifd->ifi_opackets;
+      }
+      free(buf);
+      return 0;
     }
   }
-
   free(buf);
-  return out;
+  return -2;  // Couldn't find interface
 }
-
-#endif
