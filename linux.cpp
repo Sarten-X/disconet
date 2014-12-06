@@ -2,10 +2,11 @@
 #include <fstream>
 #include "disconet.h"
 
-static void trim(std::string& s) {
+static void trim(std::string& s)
+{
   size_t startpos = s.find_first_not_of(" \t"); //ltrim
   if( std::string::npos != startpos )
-      s.erase(0, startpos);
+    s.erase(0, startpos);
 }
 
 /*
@@ -20,14 +21,16 @@ Inter-|   Receive                                                |  Transmit
 
 */
 
-int get_network_state(const std::string& interface, net_state* state) {
+int get_network_state(const std::string& interface, net_state* state)
+{
 
   std::string current_interface;
   // Declare a file stream, for reading /proc/net/dev.
   std::ifstream filestr("/proc/net/dev", std::fstream::in);
   if(!filestr) return -1;  // Couldn't open file
 
-  { // First two lines are table headers, skip those
+  {
+    // First two lines are table headers, skip those
     std::string header;
     std::getline(filestr, header);
     std::getline(filestr, header);

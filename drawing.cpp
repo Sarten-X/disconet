@@ -33,7 +33,8 @@ static void fill_rect(int y, int x, int w, int h)
 }
 
 
-void initialize_drawing() {
+void initialize_drawing()
+{
   // Start the ncurses control of the screen. Since only one window is used, it will take the whole screen.
   initscr();
 
@@ -57,7 +58,8 @@ void initialize_drawing() {
   init_pair(7, COLOR_BLACK, COLOR_BLACK);
 }
 
-static void draw_block(double xscale, double yscale, int w, int h, int type) {
+static void draw_block(double xscale, double yscale, int w, int h, int type)
+{
   int colors = 8;
   // Declare variables for the position of the tiles.
   int startx, starty, height, width, color;
@@ -85,13 +87,15 @@ static void draw_block(double xscale, double yscale, int w, int h, int type) {
   fill_rect(starty, startx, width, height);
 }
 
-void uninitialize_drawing() {
+void uninitialize_drawing()
+{
   getch();
 
   endwin();
 }
 
-void paint_drawing(const net_state& state, double xscale, double yscale) {
+void paint_drawing(const net_state& state, double xscale, double yscale)
+{
   const size_t traffic = (state.xmtbytes + state.rcvbytes) / (1024);
 
   static net_state oldstate = state;
@@ -117,6 +121,7 @@ void paint_drawing(const net_state& state, double xscale, double yscale) {
   oldtraffic = traffic;
 }
 
-void refresh_drawing() {
+void refresh_drawing()
+{
   refresh();
 }

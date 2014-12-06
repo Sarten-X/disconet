@@ -11,7 +11,8 @@
 #include <sys/sysctl.h>
 #include "disconet.h"
 
-int get_network_state(const std::string& interface, net_state* state) {
+int get_network_state(const std::string& interface, net_state* state)
+{
   return get_BSD_stats(state, interface.c_str());
 }
 

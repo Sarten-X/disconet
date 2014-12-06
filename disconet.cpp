@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
   if(!(argc == 2 || argc == 4)) {
     std::cerr << "Usage: " << argv[0] << " <interface> [xscale yscale]" << std::endl;
     return 1;
-  } 
+  }
   // Otherwise, remember the chosen interface.
   chosen_interface = argv[1];
   if (argc == 4) {
@@ -48,7 +48,8 @@ int main(int argc, char* argv[])
   return 0;
 }
 
-void loop (std::string chosen_interface, double xscale, double yscale) {
+void loop (std::string chosen_interface, double xscale, double yscale)
+{
   int h, w;
 
   // Declare space for the number of tiles and storing old traffic calculation.
