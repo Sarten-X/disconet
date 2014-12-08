@@ -4,10 +4,12 @@
 
 #include "disconet.h"
 #include "drawing.h"
-#include <unistd.h>
 
 #include <iostream>
 #include <sstream>
+
+#include <sys/time.h>
+#include <unistd.h>
 
 void loop (std::string chosen_interface, double xscale, double yscale);
 
@@ -52,6 +54,8 @@ void loop (std::string chosen_interface, double xscale, double yscale)
 {
   int h, w;
 
+  timeval start_time, end_time;
+
   // Declare space for the number of tiles and storing old traffic calculation.
   long long number = -1;
   unsigned long long oldtraffic = 0;
@@ -63,8 +67,10 @@ void loop (std::string chosen_interface, double xscale, double yscale)
 
   // Start main loop. This should have some kind of exit.
   while (1) {
+    gettimeofday(&start_time, NULL);
     // Save a copy of old data, for calculating change.
     old = current;
+
     if(get_network_state(chosen_interface, &current) != 0)
       break;
 
@@ -72,7 +78,9 @@ void loop (std::string chosen_interface, double xscale, double yscale)
 
     paint_drawing(current, xscale, yscale);
 
-    usleep(100000);	// Wait for next interval
+    gettimeofday(&end_time, NULL);
+    long int usec = REFRESH_TIME - (((end_time.tv_sec - start_time.tv_sec) * 1000000 + end_time.tv_usec) - start_time.tv_usec);
+    if (usec > 0) usleep(usec);	// Wait for next interval
     refresh_drawing();
   }
   uninitialize_drawing();

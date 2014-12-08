@@ -6,6 +6,8 @@
 #include <string>
 const int DATA_UNKNOWN = -1;
 
+const int REFRESH_TIME = 100000;
+
 struct net_state {
   size_t rcvbytes;
   size_t rcvpackets;
