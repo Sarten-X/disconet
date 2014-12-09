@@ -9,13 +9,18 @@ option(ENABLE_PCAP "Find and use PCAP" ON)
 if(ENABLE_PCAP)
   find_package(PCAP REQUIRED)
   include_directories(${PCAP_INCLUDE_DIRS})
+  set(HAVE_PCAP True)
 endif()
 
 option(ENABLE_CURSES "Find and use curses" ON)
 if(ENABLE_CURSES)
   find_package(Curses REQUIRED)
   include_directories(${CURSES_INCLUDE_DIRS})
+  set(HAVE_CURSES True)
 endif()
+
+include_directories(${PROJECT_BINARY_DIR})  # For config.h
+configure_file(config.h.in config.h)
 
 set(disconet_SRCS
   disconet.cpp)

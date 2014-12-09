@@ -1,0 +1,8 @@
+#pragma once
+#ifndef __DISCONET_CONFIG_H__
+#define __DISCONET_CONFIG_H__
+
+#cmakedefine HAVE_PCAP
+#cmakedefine HAVE_CURSES
+
+#endif // __DISCONET_CONFIG_H__
