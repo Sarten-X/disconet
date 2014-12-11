@@ -1,7 +1,7 @@
 /************************************\
 *   Copyright (C) 2007 by Sarten-X   *
 \************************************/
-#include "config.h"
+#include "config.h"   // This is generated in build/config.h from <src>/config.h.in by cmake
 #include "disconet.h"
 #include "drawing.h"
 
@@ -10,8 +10,6 @@
 
 #include <sys/time.h>
 #include <unistd.h>
-
-#include <pcap.h>
 
 void loop (std::string chosen_interface, double xscale, double yscale);
 
@@ -44,14 +42,14 @@ int main(int argc, char* argv[])
     return -1;
   }
 
-#ifdef PCAP_VERSION_MAJOR
+#ifdef HAVE_PCAP
   std::cout << "Initializing pcap" << std::endl;
   if (initialize_pcap(chosen_interface) != 0) {
     // Couldn't find the interface, exit "gracefully"
     std::cerr << "Failed to initialize pcap for \"" << chosen_interface << "\"" << std::endl;
     return -1;
   }
-#endif
+#endif  // HAVE_PCAP
 
   std::cout << "Initializing ncurses" << std::endl;
   initialize_drawing();
@@ -80,13 +78,13 @@ void loop (std::string chosen_interface, double xscale, double yscale)
     // Save a copy of old data, for calculating change.
     old = current;
 
-    #ifdef PCAP_VERSION_MAJOR
+#ifdef HAVE_PCAP
     if(get_pcap_network_state(&current) != 0)
       break;
-    #else
+#else
     if(get_network_state(chosen_interface, &current) != 0)
       break;
-    #endif // PCAP_VERSION_MAJOR
+#endif // HAVE_PCAP
 
     // Begin calculations
     //std::cout << current.rcvbytes << " " << current.rcvpackets << " " << current.xmtbytes << " " << current.xmtpackets << "\r" << std::endl;

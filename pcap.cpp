@@ -1,228 +1,176 @@
+#include "disconet.h"
+#include "config.h"
 
-#include <pcap.h>
-#ifdef PCAP_VERSION_MAJOR
+#ifndef HAVE_PCAP
+#error "Should not be compiling this, as pcap was not found."
+#endif // HAVE_PCAP
+
 #include <string>
 #include <iostream>
+#include <stdexcept>
+#include <memory>
+
+#include <pcap.h>
 
 // Used for determining time to capture
 #include <sys/time.h>
 #include <unistd.h>
 
 //#include <unordered_map>
-#include <netinet/in.h>
-#include "disconet.h"
+#include <netinet/in.h>   // ntoh*
+#include <net/ethernet.h> // struct ether_header
+#include <netinet/tcp.h>  // struct tcphdr
+#include <netinet/udp.h>  // struct udphdr
+#include <netinet/ip.h>   // struct ip
 
-//std::unordered_map<int, net_state> traffic_profile;
-net_state profile;
-pcap_t *handle;			/* Session handle */
-pcap_t *handle2;			/* Session handle */
-
-
-////////////////////////////////////////////////////////////////////////////////
-// From "Programming with pcap"
-// http://www.tcpdump.org/pcap.html
-//
-// Copyright 2002 Tim Carstens. All rights reserved. Redistribution and use,
-// with or without modification, are permitted provided that the following
-// conditions are met:
-//
-// Redistribution must retain the above copyright notice and this list of
-// conditions.
-// The name of Tim Carstens may not be used to endorse or promote products
-// derived from this document without specific prior written permission.
-////////////////////////////////////////////////////////////////////////////////
-
-/* Ethernet addresses are 6 bytes */
-#define ETHER_ADDR_LEN	6
-
-/* Ethernet header */
-struct sniff_ethernet {
-  u_char ether_dhost[ETHER_ADDR_LEN]; /* Destination host address */
-  u_char ether_shost[ETHER_ADDR_LEN]; /* Source host address */
-  u_short ether_type; /* IP? ARP? RARP? etc */
-};
-
-/* IP header */
-struct sniff_ip {
-  u_char ip_vhl;		/* version << 4 | header length >> 2 */
-  u_char ip_tos;		/* type of service */
-  u_short ip_len;		/* total length */
-  u_short ip_id;		/* identification */
-  u_short ip_off;		/* fragment offset field */
-#define IP_RF 0x8000		/* reserved fragment flag */
-#define IP_DF 0x4000		/* dont fragment flag */
-#define IP_MF 0x2000		/* more fragments flag */
-#define IP_OFFMASK 0x1fff	/* mask for fragmenting bits */
-  u_char ip_ttl;		/* time to live */
-  u_char ip_p;		/* protocol */
-  u_short ip_sum;		/* checksum */
-  struct in_addr ip_src,ip_dst; /* source and dest address */
-};
-#define IP_HL(ip)		(((ip)->ip_vhl) & 0x0f)
-#define IP_V(ip)		(((ip)->ip_vhl) >> 4)
-
-/* TCP header */
-typedef u_int tcp_seq;
-
-struct sniff_tcp {
-  u_short th_sport;	/* source port */
-  u_short th_dport;	/* destination port */
-  tcp_seq th_seq;		/* sequence number */
-  tcp_seq th_ack;		/* acknowledgement number */
-  u_char th_offx2;	/* data offset, rsvd */
-#define TH_OFF(th)	(((th)->th_offx2 & 0xf0) >> 4)
-  u_char th_flags;
-#define TH_FIN 0x01
-#define TH_SYN 0x02
-#define TH_RST 0x04
-#define TH_PUSH 0x08
-#define TH_ACK 0x10
-#define TH_URG 0x20
-#define TH_ECE 0x40
-#define TH_CWR 0x80
-#define TH_FLAGS (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECE|TH_CWR)
-  u_short th_win;		/* window */
-  u_short th_sum;		/* checksum */
-  u_short th_urp;		/* urgent pointer */
-};
-/* ethernet headers are always exactly 14 bytes */
-#define SIZE_ETHERNET 14
-const struct sniff_ethernet *ethernet; /* The ethernet header */
-const struct sniff_ip *ip; /* The IP header */
-const struct sniff_tcp *tcp; /* The TCP header */
-
-u_int size_ip;
-u_int size_tcp;
-
-net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packet) {
-  net_state state;
-  state.rcvbytes = 0;
-  state.xmtbytes = 0;
-  state.rcvpackets = 0;
-  state.xmtpackets = 0;
-  state.type = net_state::DATA_UNKNOWN;
-
-  state.rcvbytes += header->len;
-
-  ethernet = (struct sniff_ethernet*)(packet);
-	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-	size_ip = IP_HL(ip)*4;
-
-
-	if (size_ip < 20) {
-		//printf("   * Invalid IP header length: %u bytes\n", size_ip);
-		state.type = net_state::DATA_UNKNOWN;
-	} else {
-    tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-    size_tcp = TH_OFF(tcp)*4;
-    if (size_tcp < 20) {
-      //printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-      state.type = net_state::DATA_UNKNOWN;
-    } else {
-
-      if (tcp->th_dport == 22 || tcp->th_sport == 22) {
-        state.type = net_state::DATA_SSH;
-      }
-
-      if (tcp->th_dport == 80 || tcp->th_sport == 80 ||
-          tcp->th_dport == 443 || tcp->th_sport == 443) {
-        state.type = net_state::DATA_HTTP;
-      }
-    }
+class PCAPHandler {
+public:
+  PCAPHandler(const std::string& dev, const std::string& filter = std::string("")) {
+    char errbuf[PCAP_ERRBUF_SIZE];
+    inhandle =  pcap_open_live(dev.c_str(), BUFSIZ, 1, 1000, errbuf);
+    if(!inhandle)
+      throw std::runtime_error(errbuf);
+    outhandle = pcap_open_live(dev.c_str(), BUFSIZ, 1, 1000, errbuf);
+    if(!outhandle)
+      throw std::runtime_error(errbuf);
+    if (pcap_setdirection(inhandle,  PCAP_D_IN)  == -1)
+      throw std::runtime_error("Can't set direction on rcv handle");
+    if (pcap_setdirection(outhandle, PCAP_D_OUT) == -1)
+      throw std::runtime_error("Can't set direction on xmt handle");
+    setFilter(inhandle, filter, in_fp);
+    setFilter(outhandle, filter, out_fp);
+  }
+  ~PCAPHandler() {
+    if(inhandle) pcap_close(inhandle);
+    if(outhandle) pcap_close(outhandle);
+    pcap_freecode(&in_fp);
+    pcap_freecode(&out_fp);
+  }
+  int get_network_state(net_state* state) {
+    // TODO: replace "state" with "this" so we can encapsulate a std::map of a
+    // bunch of states, segregating data with context (maybe by port numbers)
+    pcap_dispatch(inhandle, -1, PCAPHandler::got_packet_rcv, (u_char*)state);
+    pcap_dispatch(outhandle, -1, PCAPHandler::got_packet_xmt, (u_char*)state);
+    return 0;
   }
 
-  return state;
-}
-////////////////////////////////////////////////////////////////////////////////
-// End derivative work
-////////////////////////////////////////////////////////////////////////////////
+private:
+  void setFilter(pcap_t* hdl, const std::string& filter, struct bpf_program& fp) {
+    if(pcap_compile(hdl, &fp, filter.c_str(), 0, PCAP_NETMASK_UNKNOWN) == -1)
+      throw std::runtime_error(pcap_geterr(hdl));
+    if(pcap_setfilter(hdl, &fp) == -1)
+      throw std::runtime_error(pcap_geterr(hdl));
+  }
 
-void got_packet_rcv(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-  net_state single_state = get_packet_data(header, packet);
-  //net_state profile = //traffic_profile[single_state.type];
-  profile.rcvbytes += single_state.rcvbytes;
-  profile.rcvpackets++;
-  //traffic_profile[single_state.type] = profile;
-}
-void got_packet_xmt(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-  net_state single_state = get_packet_data(header, packet);
-  //net_state profile = traffic_profile[single_state.type];
-  profile.xmtbytes += single_state.rcvbytes;
-  profile.xmtpackets++;
-  //traffic_profile[single_state.type] = profile;
-}
+  static void got_packet_rcv(u_char* user, const struct pcap_pkthdr* h, const u_char* bytes) {
+    // TODO: Seperate this out, handle specific transports, etc in different functions.
+    net_state* state = (net_state*)user;
+    const uint8_t* data = bytes;
+    const struct ether_header* ether = (const struct ether_header*)data;
+    const struct ip* ip_ptr = (const struct ip*)(data += sizeof(struct ether_header));
+    // Use caplen, as that is the size of the allocated packet.  len is what it
+    // would have been had we captured everything (result of timing out, etc)
+    if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+    data += ip_ptr->ip_hl * 4;
+    if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+    switch(ip_ptr->ip_p) {
+    case IPPROTO_TCP:
+    {
+      const struct tcphdr* tcp = (const struct tcphdr*)(data);
+      data += tcp->doff * 4;
+      if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+      uint32_t len = h->caplen - (data - bytes);
+      // Now we have the entire stack for a TCP packet, up to and including the payload
+      switch(ntohs(tcp->th_dport)) {  // Remember endianess, use ntoh[sl]
+      case 22:
+        state->type = net_state::DATA_SSH; break;
+      case 80:
+      case 443:
+        state->type = net_state::DATA_HTTP; break;
+      // TODO: Add more application protocols here.
+      default: break;
+      }
+    } break;
+    case IPPROTO_UDP:
+    {
+      const struct udphdr* udp = (const struct udphdr*)(data);
+      data += sizeof(struct udphdr);
+      if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+      uint32_t len = h->caplen - (data - bytes);
+      // Now we have the entire stack for a UDP packet, up to and including the payload
+    } break;
+    // TODO: Other transport protocols here (defined in netinet/in.h)
+    default: return;
+    }
+
+    ++state->rcvpackets;
+    state->rcvbytes += h->len;
+  }
+
+  static void got_packet_xmt(u_char* user, const struct pcap_pkthdr* h, const u_char* bytes) {
+    net_state* state = (net_state*)user;
+    const uint8_t* data = bytes;
+    const struct ether_header* ether = (const struct ether_header*)data;
+    const struct ip* ip_ptr = (const struct ip*)(data += sizeof(struct ether_header));
+    // Use caplen, as that is the size of the allocated packet.  len is what it
+    // would have been had we captured everything (result of timing out, etc)
+    if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+    data += ip_ptr->ip_hl * 4;
+    if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+    switch(ip_ptr->ip_p) {
+    case IPPROTO_TCP:
+    {
+      const struct tcphdr* tcp = (const struct tcphdr*)(data);
+      data += tcp->doff * 4;
+      if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+      uint32_t len = h->caplen - (data - bytes);
+      // Now we have the entire stack for a TCP packet, up to and including the payload
+      switch(ntohs(tcp->th_dport)) {  // Remember endianess, use ntoh[sl]
+      case 22:
+        state->type = net_state::DATA_SSH; break;
+      case 80:
+      case 443:
+        state->type = net_state::DATA_HTTP; break;
+      // TODO: Add more application protocols here.
+      default: break;
+      }
+    } break;
+    case IPPROTO_UDP:
+    {
+      const struct udphdr* udp = (const struct udphdr*)(data);
+      data += sizeof(struct udphdr);
+      if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+      uint32_t len = h->caplen - (data - bytes);
+      // Now we have the entire stack for a UDP packet, up to and including the payload
+    } break;
+    // TODO: Other transport protocols here (defined in netinet/in.h)
+    default: return;
+    }
+
+    ++state->xmtpackets;
+    state->xmtbytes += h->len;
+  }
+
+  pcap_t* inhandle;
+  pcap_t* outhandle;
+  struct bpf_program in_fp, out_fp; // Not sure you need two fps, but they seem
+                                    // to be per-handle.
+};
+
+static std::auto_ptr<PCAPHandler> handler;
 
 int get_pcap_network_state(net_state* state) {
-  pcap_dispatch(handle, -1, got_packet_rcv, NULL);
-  pcap_dispatch(handle2, -1, got_packet_xmt, NULL);
-
-  state->rcvbytes = profile.rcvbytes;
-  state->rcvpackets = profile.rcvpackets;
-  state->xmtbytes = profile.xmtbytes;
-  state->xmtpackets = profile.xmtpackets;
-
-  //std::cout << "PCAP: " << profile.rcvbytes << " " << profile.rcvpackets << " " << profile.xmtbytes << " " << profile.xmtpackets << "\r" << std::endl;
-  //std::cerr << "ERR: " << pcap_geterr(handle) << "        " << pcap_geterr(handle2) << std::endl;
+  if(handler.get() == NULL) return -1;
+  handler->get_network_state(state);
   return 0;
 }
 
 int initialize_pcap(const std::string& interface) {
-  const char *dev = interface.c_str();			/* The device to sniff on */
-  char errbuf[PCAP_ERRBUF_SIZE];	/* Error string */
-  struct bpf_program fp;		/* The compiled filter */
-  char filter_exp[] = "";	/* The filter expression */
-  bpf_u_int32 mask;		/* Our netmask */
-  bpf_u_int32 net;		/* Our IP */
-  //struct pcap_pkthdr header;	/* The header that pcap gives us */
-  //const u_char *packet;		/* The actual packet */
-
-  /* Find the properties for the device */
-  if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
-    std::cerr << "Couldn't get netmask for device " << dev << ": " << errbuf << std::endl;
-    net = 0;
-    mask = 0;
+  try {
+    handler.reset(new PCAPHandler(interface));
+  } catch(const std::runtime_error& e) {
+    std::cerr << "Failed to initialize pcap " << e.what() << std::endl;
+    return -1;
   }
-  /* Open the session in promiscuous mode */
-  handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-  if (handle == NULL) {
-    std::cerr << "Couldn't open device " << dev << ": " << errbuf << std::endl;
-    return(2);
-  }
-  /* Compile and apply the filter */
-  if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
-    std::cerr << "Couldn't parse filter " << filter_exp << ": " << pcap_geterr(handle) << std::endl;
-    return(2);
-  }
-  if (pcap_setfilter(handle, &fp) == -1) {
-    std::cerr << "Couldn't install filter " << filter_exp << ": " << pcap_geterr(handle) << std::endl;
-    return(2);
-  }
-  if (pcap_setdirection(handle, PCAP_D_IN) == -1) {
-    std::cerr << "Couldn't set direction IN: " << pcap_geterr(handle) << std::endl;
-    return(2);
-  }
-
-  /* Open the session in promiscuous mode */
-  handle2 = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-  if (handle == NULL) {
-    std::cerr << "Couldn't open device " << dev << ": " << errbuf << std::endl;
-    return(2);
-  }
-  /* Compile and apply the filter */
-  if (pcap_compile(handle2, &fp, filter_exp, 0, net) == -1) {
-    std::cerr << "Couldn't parse filter " << filter_exp << ": " << pcap_geterr(handle) << std::endl;
-    return(2);
-  }
-  if (pcap_setfilter(handle2, &fp) == -1) {
-    std::cerr << "Couldn't install filter " << filter_exp << ": " << pcap_geterr(handle) << std::endl;
-    return(2);
-  }
-  if (pcap_setdirection(handle2, PCAP_D_OUT) == -1) {
-    std::cerr << "Couldn't set direction OUT: " << pcap_geterr(handle) << std::endl;
-    return(2);
-  }
-
   return 0;
 }
-
-#endif // PCAP_VERSION_MAJOR
