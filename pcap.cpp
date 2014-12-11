@@ -102,9 +102,12 @@ net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packe
   state.xmtpackets = 0;
   state.type = DATA_UNKNOWN;
 
+  state.rcvbytes += header.len;
+
   ethernet = (struct sniff_ethernet*)(packet);
 	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
 	size_ip = IP_HL(ip)*4;
+
 
 	if (size_ip < 20) {
 		//printf("   * Invalid IP header length: %u bytes\n", size_ip);
@@ -125,11 +128,10 @@ net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packe
           tcp->th_dport == 443 || tcp->th_sport == 443) {
         state.type = DATA_HTTP;
       }
-
-      state.rcvbytes += ip->ip_len;
-      return state;
     }
   }
+
+  return state;
 }
 ////////////////////////////////////////////////////////////////////////////////
 // End derivative work
@@ -159,7 +161,7 @@ int get_pcap_network_state(net_state* state) {
   state->xmtbytes = profile.xmtbytes;
   state->xmtpackets = profile.xmtpackets;
 
-  std::cout << "PCAP: " << profile.rcvbytes << " " << profile.rcvpackets << " " << profile.xmtbytes << " " << profile.xmtpackets << "\r" << std::endl;
+  //std::cout << "PCAP: " << profile.rcvbytes << " " << profile.rcvpackets << " " << profile.xmtbytes << " " << profile.xmtpackets << "\r" << std::endl;
   //std::cerr << "ERR: " << pcap_geterr(handle) << "        " << pcap_geterr(handle2) << std::endl;
   return 0;
 }
