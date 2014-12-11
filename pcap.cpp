@@ -136,16 +136,16 @@ net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packe
 ////////////////////////////////////////////////////////////////////////////////
 
 void got_packet_rcv(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-  net_state single_state = get_packet_data(header, packet);
+  //net_state single_state = get_packet_data(header, packet);
   //net_state profile = //traffic_profile[single_state.type];
-  profile.rcvbytes += single_state.rcvbytes;
+  profile.rcvbytes += header->len;
   profile.rcvpackets++;
   //traffic_profile[single_state.type] = profile;
 }
 void got_packet_xmt(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-  net_state single_state = get_packet_data(header, packet);
+  //net_state single_state = get_packet_data(header, packet);
   //net_state profile = traffic_profile[single_state.type];
-  profile.xmtbytes += single_state.rcvbytes;
+  profile.xmtbytes += header->len;
   profile.xmtpackets++;
   //traffic_profile[single_state.type] = profile;
 }
