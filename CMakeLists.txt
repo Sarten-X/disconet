@@ -51,7 +51,6 @@ add_executable(disconet ${disconet_SRCS})
 
 if(PCAP_FOUND)
   target_link_libraries(disconet ${PCAP_LIBRARIES})
-#  add_definitions(-std=c++11)
 endif()
 
 if(CURSES_FOUND)

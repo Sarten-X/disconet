@@ -113,7 +113,7 @@ void paint_drawing(const net_state& state, double xscale, double yscale)
 
   // Draw the blocks
   for(size_t i = 0; i < number; i++)
-    draw_block(xscale, yscale, w, h, DATA_UNKNOWN);
+    draw_block(xscale, yscale, w, h, (int)state.type);
 
   // Update internal state
   oldstate = state;

@@ -4,5 +4,7 @@
 
 #cmakedefine HAVE_PCAP
 #cmakedefine HAVE_CURSES
+#cmakedefine HAVE_CXX11
+#cmakedefine HAVE_CXX01
 
 #endif // __DISCONET_CONFIG_H__

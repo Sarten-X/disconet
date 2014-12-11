@@ -100,9 +100,9 @@ net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packe
   state.xmtbytes = 0;
   state.rcvpackets = 0;
   state.xmtpackets = 0;
-  state.type = DATA_UNKNOWN;
+  state.type = net_state::DATA_UNKNOWN;
 
-  state.rcvbytes += header.len;
+  state.rcvbytes += header->len;
 
   ethernet = (struct sniff_ethernet*)(packet);
 	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
@@ -111,22 +111,22 @@ net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packe
 
 	if (size_ip < 20) {
 		//printf("   * Invalid IP header length: %u bytes\n", size_ip);
-		state.type = DATA_UNKNOWN;
+		state.type = net_state::DATA_UNKNOWN;
 	} else {
     tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
     size_tcp = TH_OFF(tcp)*4;
     if (size_tcp < 20) {
       //printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-      state.type = DATA_UNKNOWN;
+      state.type = net_state::DATA_UNKNOWN;
     } else {
 
       if (tcp->th_dport == 22 || tcp->th_sport == 22) {
-        state.type = DATA_SSH;
+        state.type = net_state::DATA_SSH;
       }
 
       if (tcp->th_dport == 80 || tcp->th_sport == 80 ||
           tcp->th_dport == 443 || tcp->th_sport == 443) {
-        state.type = DATA_HTTP;
+        state.type = net_state::DATA_HTTP;
       }
     }
   }
