@@ -86,7 +86,7 @@ private:
       if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
       uint32_t len = h->caplen - (data - bytes);
       // Now we have the entire stack for a TCP packet, up to and including the payload
-      switch(ntohs(tcp->th_dport)) {  // Remember endianess, use ntoh[sl]
+      switch(ntohs(tcp->source)) {  // Remember endianess, use ntoh[sl]
       case 22:
         state->type = net_state::DATA_SSH;
         break;
@@ -135,7 +135,7 @@ private:
       if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
       uint32_t len = h->caplen - (data - bytes);
       // Now we have the entire stack for a TCP packet, up to and including the payload
-      switch(ntohs(tcp->th_dport)) {  // Remember endianess, use ntoh[sl]
+      switch(ntohs(tcp->dest)) {  // Remember endianess, use ntoh[sl]
       case 22:
         state->type = net_state::DATA_SSH;
         break;
