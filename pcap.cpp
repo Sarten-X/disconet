@@ -96,20 +96,20 @@ u_int size_tcp;
 
 net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packet) {
   net_state state;
-  state.rcvbytes = 0;
+  state.rcvbytes = header->len;
   state.xmtbytes = 0;
   state.rcvpackets = 0;
   state.xmtpackets = 0;
   state.type = DATA_UNKNOWN;
 
   ethernet = (struct sniff_ethernet*)(packet);
-	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-	size_ip = IP_HL(ip)*4;
+  ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
+  size_ip = IP_HL(ip)*4;
 
-	if (size_ip < 20) {
-		//printf("   * Invalid IP header length: %u bytes\n", size_ip);
-		state.type = DATA_UNKNOWN;
-	} else {
+  if (size_ip < 20) {
+    //printf("   * Invalid IP header length: %u bytes\n", size_ip);
+    state.type = DATA_UNKNOWN;
+  } else {
     tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
     size_tcp = TH_OFF(tcp)*4;
     if (size_tcp < 20) {
@@ -126,26 +126,25 @@ net_state get_packet_data (const struct pcap_pkthdr *header, const u_char *packe
         state.type = DATA_HTTP;
       }
 
-      state.rcvbytes += ip->ip_len;
-      return state;
     }
   }
+  return state;
 }
 ////////////////////////////////////////////////////////////////////////////////
 // End derivative work
 ////////////////////////////////////////////////////////////////////////////////
 
 void got_packet_rcv(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-  //net_state single_state = get_packet_data(header, packet);
+  net_state single_state = get_packet_data(header, packet);
   //net_state profile = //traffic_profile[single_state.type];
-  profile.rcvbytes += header->len;
+  profile.rcvbytes += single_state.rcvbytes;
   profile.rcvpackets++;
   //traffic_profile[single_state.type] = profile;
 }
 void got_packet_xmt(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-  //net_state single_state = get_packet_data(header, packet);
+  net_state single_state = get_packet_data(header, packet);
   //net_state profile = traffic_profile[single_state.type];
-  profile.xmtbytes += header->len;
+  profile.xmtbytes += single_state.rcvbytes;
   profile.xmtpackets++;
   //traffic_profile[single_state.type] = profile;
 }
