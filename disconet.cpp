@@ -89,7 +89,7 @@ void loop (std::string chosen_interface, double xscale, double yscale)
     #endif // PCAP_VERSION_MAJOR
 
     // Begin calculations
-    std::cout << current.rcvbytes << " " << current.rcvpackets << " " << current.xmtbytes << " " << current.xmtpackets << "\r" << std::endl;
+    //std::cout << current.rcvbytes << " " << current.rcvpackets << " " << current.xmtbytes << " " << current.xmtpackets << "\r" << std::endl;
     paint_drawing(current, xscale, yscale);
 
     gettimeofday(&end_time, NULL);
