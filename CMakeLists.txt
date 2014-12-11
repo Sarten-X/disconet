@@ -41,12 +41,17 @@ if(CURSES_FOUND)
   set(disconet_SRCS ${disconet_SRCS} drawing.cpp)
 endif()
 
+if(PCAP_FOUND)
+  set(disconet_SRCS ${disconet_SRCS} pcap.cpp)
+endif()
+
 add_executable(disconet ${disconet_SRCS})
 
 # Add in the link libraries
 
 if(PCAP_FOUND)
   target_link_libraries(disconet ${PCAP_LIBRARIES})
+  add_definitions(-std=c++11)
 endif()
 
 if(CURSES_FOUND)

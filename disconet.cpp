@@ -1,7 +1,7 @@
 /************************************\
 *   Copyright (C) 2007 by Sarten-X   *
 \************************************/
-
+#include "config.h"
 #include "disconet.h"
 #include "drawing.h"
 
@@ -10,6 +10,8 @@
 
 #include <sys/time.h>
 #include <unistd.h>
+
+#include <pcap.h>
 
 void loop (std::string chosen_interface, double xscale, double yscale);
 
@@ -42,8 +44,17 @@ int main(int argc, char* argv[])
     return -1;
   }
 
-  std::cout << "Initializing ncurses" << std::endl;
+#ifdef PCAP_VERSION_MAJOR
+  std::cout << "Initializing pcap" << std::endl;
+  if (initialize_pcap(chosen_interface) != 0) {
+    // Couldn't find the interface, exit "gracefully"
+    std::cerr << "Failed to initialize pcap for \"" << chosen_interface << "\"" << std::endl;
+    return -1;
+  }
+#endif
 
+  std::cout << "Initializing ncurses" << std::endl;
+  initialize_drawing();
   // All configuration is done.
   std::cout << "Starting monitoring" << std::endl;
   loop(chosen_interface, xscale, yscale);
@@ -63,19 +74,22 @@ void loop (std::string chosen_interface, double xscale, double yscale)
   // Declare placeholders for all the fields in /proc/net/dev. I wallow in wasted RAM.
   net_state current, old;
 
-  initialize_drawing();
-
   // Start main loop. This should have some kind of exit.
   while (1) {
     gettimeofday(&start_time, NULL);
     // Save a copy of old data, for calculating change.
     old = current;
 
+    #ifdef PCAP_VERSION_MAJOR
+    if(get_pcap_network_state(&current) != 0)
+      break;
+    #else
     if(get_network_state(chosen_interface, &current) != 0)
       break;
+    #endif // PCAP_VERSION_MAJOR
 
     // Begin calculations
-
+    std::cout << current.rcvbytes << " " << current.rcvpackets << " " << current.xmtbytes << " " << current.xmtpackets << "\r" << std::endl;
     paint_drawing(current, xscale, yscale);
 
     gettimeofday(&end_time, NULL);
