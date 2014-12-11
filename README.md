@@ -1,4 +1,4 @@
-disconet ![](https://api.travis-ci.org/Sarten-X/disconet.svg)
+disconet [![Build Status](https://travis-ci.org/Sarten-X/disconet.svg?branch=master)](https://travis-ci.org/Sarten-X/disconet)
 ========
 
 A visual network traffic monitor.
