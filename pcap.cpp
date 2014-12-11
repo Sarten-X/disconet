@@ -159,7 +159,7 @@ int get_pcap_network_state(net_state* state) {
   state->xmtbytes = profile.xmtbytes;
   state->xmtpackets = profile.xmtpackets;
 
-  std::cout << "PCAP: " << profile.rcvbytes << " " << profile.rcvpackets << " " << profile.xmtbytes << " " << profile.xmtpackets << "\r" << std::endl;
+  //std::cout << "PCAP: " << profile.rcvbytes << " " << profile.rcvpackets << " " << profile.xmtbytes << " " << profile.xmtpackets << "\r" << std::endl;
   //std::cerr << "ERR: " << pcap_geterr(handle) << "        " << pcap_geterr(handle2) << std::endl;
   return 0;
 }
