@@ -74,6 +74,9 @@ int main(int argc, char* argv[])
   // All configuration is done.
   std::cout << "Starting monitoring" << std::endl;
   loop(options);
+
+  std::cout << "Cleaning up" << std::endl;
+  uninitialize_drawing();
   return 0;
 }
 
@@ -115,5 +118,4 @@ void loop (runtime_options options)
     if (usec > 0) usleep(usec);	// Wait for next interval
     refresh_drawing();
   }
-  uninitialize_drawing();
 }
