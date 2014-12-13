@@ -38,6 +38,13 @@ struct net_state {
   dataType_t type;
 };
 
+struct runtime_options {
+  double xscale;
+  double yscale;
+  bool profile;
+  std::string interface;
+};
+
 extern int get_network_state(const std::string& interface, net_state* state);
 
 extern int initialize_pcap(const std::string& interface);
