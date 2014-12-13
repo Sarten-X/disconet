@@ -22,28 +22,30 @@ int main(int argc, char* argv[])
   options.xscale = 1;
   options.yscale = 1;
 
-  // TODO: Reimplement a help message
-  // If a dumb number of parameters was supplied, print the usage message and exit.
-  //if(!(argc == 2 || argc == 4)) {
-  //  std::cerr << "Usage: " << argv[0] << " <interface> [xscale yscale]" << std::endl;
-  //  return 1;
-  //}
   int option;
 
   opterr = 0;
   while ((option = getopt (argc, argv, "h:w:i:p")) != -1) switch (option) {
     case 'h':
       options.yscale = atof(optarg);
+      break;
     case 'w':
       options.xscale = atof(optarg);
+      break;
     case 'i':
       options.interface = optarg;
+      break;
     case 'p':
       options.profile = true;
+      break;
+    default:
+      std::cerr << "Usage: " << argv[0] << "-i <interface> [-w xscale] [-h yscale] [-p]" << std::endl;
+      exit(1);
   }
 
   if (options.interface == "") {
-    options.interface = argv[optind];
+    std::cerr << "Error: The -i option is required" << std::endl;
+    exit(1);
   }
 
 
