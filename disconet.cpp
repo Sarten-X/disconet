@@ -82,8 +82,6 @@ int main(int argc, char* argv[])
 
 void loop (runtime_options options)
 {
-  int h, w;
-
   timeval start_time, end_time;
 
   // Declare space for the number of tiles and storing old traffic calculation.
