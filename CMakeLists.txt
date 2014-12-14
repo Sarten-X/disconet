@@ -3,6 +3,14 @@ cmake_minimum_required(VERSION 2.8.7)
 
 project(disconet)
 
+if(CMAKE_COMPILER_IS_GNUCXX)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+  set(CMAKE_CXX_DEBUG_FLAGS "${CMAKE_DEBUG_CXX_FLAGS} -Werror")
+elseif(MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
+  set(CMAKE_CXX_DEBUG_FLAGS "${CMAKE_DEBUG_CXX_FLAGS} /WX")
+endif()
+
 # Add extra warnings for GNU for debugging purposes
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
