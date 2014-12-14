@@ -16,6 +16,17 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/Modules)
 
+include(CheckIncludeFiles)
+
+option(ENABLE_GETOPT "Find and use getopt" ON)
+if(UNIX AND ENABLE_GETOPT)    # apple, linux or cygwin
+  check_include_files(getopt.h HAVE_GETOPT)
+endif()
+
+if(NOT HAVE_GETOPT)
+  message(FATAL_ERROR "getopt is currently required")
+endif()
+
 option(ENABLE_PCAP "Find and use PCAP" ON)
 if(ENABLE_PCAP)
   find_package(PCAP REQUIRED)
@@ -34,6 +45,7 @@ option(ENABLE_BOOST "Find and use boost" OFF)
 if(ENABLE_BOOST)
   find_package(Boost COMPONENTS program_options REQUIRED)
   include_directories(${Boost_INCLUDE_DIR})
+  set(HAVE_BOOST True)
 endif()
 
 include_directories(${PROJECT_BINARY_DIR})  # For config.h
@@ -42,7 +54,6 @@ configure_file(config.h.in config.h)
 set(disconet_SRCS
   disconet.cpp)
 
-include(CheckIncludeFiles)
 # Check for net/if_dl.h on bsd
 check_include_files(net/if_dl.h HAVE_IFDL_H)
 

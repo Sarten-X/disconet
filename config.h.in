@@ -4,6 +4,8 @@
 
 #cmakedefine HAVE_PCAP
 #cmakedefine HAVE_CURSES
+#cmakedefine HAVE_GETOPT
+#cmakedefine HAVE_BOOST
 #cmakedefine HAVE_CXX11
 #cmakedefine HAVE_CXX01
 
