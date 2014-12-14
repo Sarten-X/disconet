@@ -30,6 +30,12 @@ if(ENABLE_CURSES)
   set(HAVE_CURSES True)
 endif()
 
+option(ENABLE_BOOST "Find and use boost" OFF)
+if(ENABLE_BOOST)
+  find_package(Boost COMPONENTS program_options REQUIRED)
+  include_directories(${Boost_INCLUDE_DIR})
+endif()
+
 include_directories(${PROJECT_BINARY_DIR})  # For config.h
 configure_file(config.h.in config.h)
 
@@ -60,10 +66,7 @@ add_executable(disconet ${disconet_SRCS})
 
 # Add in the link libraries
 
-if(PCAP_FOUND)
-  target_link_libraries(disconet ${PCAP_LIBRARIES})
-endif()
-
-if(CURSES_FOUND)
-  target_link_libraries(disconet ${CURSES_LIBRARIES})
-endif()
+target_link_libraries(disconet
+          ${PCAP_LIBRARIES}
+          ${CURSES_LIBRARIES}
+          ${Boost_LIBRARIES})
