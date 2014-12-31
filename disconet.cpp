@@ -14,6 +14,8 @@
 
 void loop (runtime_options options);
 
+int exit_status = 0;
+
 int main(int argc, char* argv[])
 {
   runtime_options options;
@@ -80,21 +82,17 @@ int main(int argc, char* argv[])
 
   std::cout << "Cleaning up" << std::endl;
   uninitialize_drawing();
-  return 0;
+  return exit_status;
 }
 
 void loop (runtime_options options)
 {
   timeval start_time, end_time;
 
-  // Declare space for the number of tiles and storing old traffic calculation.
-  long long number = -1;
-  unsigned long long oldtraffic = 0;
-
   net_state current;
 
   // Start main loop. This should have some kind of exit.
-  while (1) {
+  while (!exit_status) {
     gettimeofday(&start_time, NULL);
 
 
@@ -119,8 +117,8 @@ void loop (runtime_options options)
     for(std::map<dataType_t, net_state>::iterator iter=states.begin(); iter!=states.end(); ++iter) {
       current = iter->second;
       size_t object_count = (current.rcvbytes + current.xmtbytes) / BYTES_PER_OBJECT;
-      size_t rcv_bytes_per_object = current.rcvbytes / std::max(object_count,(long unsigned int)1);
-      size_t xmt_bytes_per_object = current.xmtbytes / std::max(object_count,(long unsigned int)1);
+      size_t rcv_bytes_per_object = current.rcvbytes;// std::max(current.rcvpackets+current.xmtpackets,(long unsigned int)1);
+      size_t xmt_bytes_per_object = current.xmtbytes; // std::max(current.rcvpackets+current.xmtpackets,(long unsigned int)1);
       for (int i = object_count; i > 0; --i) {
         net_state object;
         object.rcvbytes = rcv_bytes_per_object;
@@ -128,7 +126,7 @@ void loop (runtime_options options)
         object.rcvpackets = 1;
         object.xmtpackets = 1;
         object.type = current.type;
-        packets.push_back(current);
+        packets.push_back(object);
       }
     }
 
@@ -144,4 +142,9 @@ void loop (runtime_options options)
     long int usec = REFRESH_TIME - (((end_time.tv_sec - start_time.tv_sec) * 1000000 + end_time.tv_usec) - start_time.tv_usec);
     if (usec > 0) usleep(usec);	// Wait for next interval
   }
+}
+
+int terminate(int reason) {
+  exit_status = reason;
+  return 0;
 }

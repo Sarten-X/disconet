@@ -10,4 +10,6 @@ void paint_drawing(const std::vector<net_state> objects, const std::map<dataType
 
 void refresh_drawing();
 
+extern int terminate(int reason);
+
 #endif // __DISONETDRAWING_H__

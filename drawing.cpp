@@ -56,6 +56,8 @@ void initialize_drawing()
   init_pair(5, COLOR_BLUE, COLOR_BLUE);
   init_pair(6, COLOR_MAGENTA, COLOR_MAGENTA);
   init_pair(7, COLOR_BLACK, COLOR_BLACK);
+
+  timeout(100);
 }
 
 static void draw_block(int w, int h, int type)
@@ -96,9 +98,9 @@ void uninitialize_drawing() {
 void paint_drawing(const std::vector<net_state> objects, const std::map<dataType_t, net_state> aggregate, double xmultipler, double ymultipler) {
   for (std::vector<net_state>::const_iterator it=objects.begin(); it!=objects.end(); ++it) {
     net_state state = *it;
-   // Draw the blocks
-    size_t w = state.xmtbytes / 1024;
-    size_t h = state.rcvbytes / 1024;
+   // Draw the blocks, scaling by 256KB per unit height or width
+    size_t w = state.xmtbytes / 1024 / 256;
+    size_t h = state.rcvbytes / 1024 / 256;
     draw_block(w, h, (int)state.type);
 
   }
@@ -108,4 +110,12 @@ void paint_drawing(const std::vector<net_state> objects, const std::map<dataType
 
 void refresh_drawing() {
   refresh();
+  int chr = getch();
+  switch(chr) {
+    case 'q':
+      terminate(1);
+      break;
+    default:
+      break;
+  }
 }

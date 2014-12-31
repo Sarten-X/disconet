@@ -6,7 +6,7 @@
 #include <string>
 
 #define DIRECTION_SEND (0)
-#define BYTES_PER_OBJECT (256)
+#define BYTES_PER_OBJECT (2048)
 #define REFRESH_TIME (100000)
 
 #include <map>
@@ -38,6 +38,5 @@ struct runtime_options {
 extern int get_network_state(const std::string& interface, net_state* state);
 
 extern int initialize_pcap(const std::string& interface);
-extern int get_pcap_network_state(net_state*
-state);
+extern int get_pcap_network_state(net_state* state);
 #endif // __DISCONET_H__
