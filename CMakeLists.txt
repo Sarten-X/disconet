@@ -3,10 +3,29 @@ cmake_minimum_required(VERSION 2.8.7)
 
 project(disconet)
 
+if(CMAKE_COMPILER_IS_GNUCXX)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+  set(CMAKE_CXX_DEBUG_FLAGS "${CMAKE_DEBUG_CXX_FLAGS} -Werror")
+elseif(MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
+  set(CMAKE_CXX_DEBUG_FLAGS "${CMAKE_DEBUG_CXX_FLAGS} /WX")
+endif()
+
 # Add extra warnings for GNU for debugging purposes
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/Modules)
+
+include(CheckIncludeFiles)
+
+option(ENABLE_GETOPT "Find and use getopt" ON)
+if(UNIX AND ENABLE_GETOPT)    # apple, linux or cygwin
+  check_include_files(getopt.h HAVE_GETOPT)
+endif()
+
+if(NOT HAVE_GETOPT)
+  message(FATAL_ERROR "getopt is currently required")
+endif()
 
 option(ENABLE_PCAP "Find and use PCAP" ON)
 if(ENABLE_PCAP)
@@ -22,13 +41,19 @@ if(ENABLE_CURSES)
   set(HAVE_CURSES True)
 endif()
 
+option(ENABLE_BOOST "Find and use boost" OFF)
+if(ENABLE_BOOST)
+  find_package(Boost COMPONENTS program_options REQUIRED)
+  include_directories(${Boost_INCLUDE_DIR})
+  set(HAVE_BOOST True)
+endif()
+
 include_directories(${PROJECT_BINARY_DIR})  # For config.h
 configure_file(config.h.in config.h)
 
 set(disconet_SRCS
   disconet.cpp)
 
-include(CheckIncludeFiles)
 # Check for net/if_dl.h on bsd
 check_include_files(net/if_dl.h HAVE_IFDL_H)
 
@@ -52,10 +77,7 @@ add_executable(disconet ${disconet_SRCS})
 
 # Add in the link libraries
 
-if(PCAP_FOUND)
-  target_link_libraries(disconet ${PCAP_LIBRARIES})
-endif()
-
-if(CURSES_FOUND)
-  target_link_libraries(disconet ${CURSES_LIBRARIES})
-endif()
+target_link_libraries(disconet
+          ${PCAP_LIBRARIES}
+          ${CURSES_LIBRARIES}
+          ${Boost_LIBRARIES})
