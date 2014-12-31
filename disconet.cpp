@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <algorithm>    // std::random_shuffle
 
 #include <sys/time.h>
 #include <unistd.h>
@@ -90,15 +91,14 @@ void loop (runtime_options options)
   long long number = -1;
   unsigned long long oldtraffic = 0;
 
-  // Declare placeholders for all the fields in /proc/net/dev. I wallow in wasted RAM.
-  net_state current, old;
+  net_state current;
 
   // Start main loop. This should have some kind of exit.
   while (1) {
     gettimeofday(&start_time, NULL);
-    // Save a copy of old data, for calculating change.
-    old = current;
 
+
+    std::map<dataType_t, net_state> states;
     if (options.profile) {
       #ifdef HAVE_PCAP
       if(get_pcap_network_state(&current) != 0)
@@ -109,13 +109,39 @@ void loop (runtime_options options)
         break;
     }
 
+    // This belongs in the source routine. Sources should return this map.
+    states[current.type] = current;
+
+    // Expand the map of network data into a vector of representative objects.
+    // Each object represents a "typical" packet of a specific data type, scaled
+    // according to the runtime options.
+    std::vector<net_state> packets;
+    for(std::map<dataType_t, net_state>::iterator iter=states.begin(); iter!=states.end(); ++iter) {
+      current = iter->second;
+      size_t object_count = (current.rcvbytes + current.xmtbytes) / BYTES_PER_OBJECT;
+      size_t rcv_bytes_per_object = current.rcvbytes / std::max(object_count,(long unsigned int)1);
+      size_t xmt_bytes_per_object = current.xmtbytes / std::max(object_count,(long unsigned int)1);
+      for (int i = object_count; i > 0; --i) {
+        net_state object;
+        object.rcvbytes = rcv_bytes_per_object;
+        object.xmtbytes = xmt_bytes_per_object;
+        object.rcvpackets = 1;
+        object.xmtpackets = 1;
+        object.type = current.type;
+        packets.push_back(current);
+      }
+    }
+
+    std::random_shuffle ( packets.begin(), packets.end() );
+
     // Begin calculations
     //std::cout << current.rcvbytes << " " << current.rcvpackets << " " << current.xmtbytes << " " << current.xmtpackets << "\r" << std::endl;
-    paint_drawing(current, options.xscale, options.yscale);
+    paint_drawing(packets, states, options.xscale, options.yscale);
+
+    refresh_drawing();
 
     gettimeofday(&end_time, NULL);
     long int usec = REFRESH_TIME - (((end_time.tv_sec - start_time.tv_sec) * 1000000 + end_time.tv_usec) - start_time.tv_usec);
     if (usec > 0) usleep(usec);	// Wait for next interval
-    refresh_drawing();
   }
 }

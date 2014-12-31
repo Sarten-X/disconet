@@ -88,11 +88,11 @@ private:
       // Now we have the entire stack for a TCP packet, up to and including the payload
       switch(ntohs(tcp->source)) {  // Remember endianess, use ntoh[sl]
       case 22:
-        state->type = net_state::DATA_SSH;
+        state->type = DATA_SSH;
         break;
       case 80:
       case 443:
-        state->type = net_state::DATA_HTTP;
+        state->type = DATA_HTTP;
         break;
       // TODO: Add more application protocols here.
       default:
@@ -137,11 +137,11 @@ private:
       // Now we have the entire stack for a TCP packet, up to and including the payload
       switch(ntohs(tcp->dest)) {  // Remember endianess, use ntoh[sl]
       case 22:
-        state->type = net_state::DATA_SSH;
+        state->type = DATA_SSH;
         break;
       case 80:
       case 443:
-        state->type = net_state::DATA_HTTP;
+        state->type = DATA_HTTP;
         break;
       // TODO: Add more application protocols here.
       default:

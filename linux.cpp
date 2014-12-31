@@ -1,6 +1,9 @@
 #include <string>
 #include <fstream>
+
 #include "disconet.h"
+
+net_state current, old;
 
 static void trim(std::string& s)
 {
@@ -23,7 +26,22 @@ Inter-|   Receive                                                |  Transmit
 
 int get_network_state(const std::string& interface, net_state* state)
 {
+  // dummy variables
+  size_t rcverrs;
+  size_t rcvdrop;
+  size_t rcvfifo;
+  size_t rcvframe;
+  size_t rcvcompressed;
+  size_t rcvmulticast;
 
+  size_t xmterrs;
+  size_t xmtdrop;
+  size_t xmtfifo;
+  size_t xmtcolls;
+  size_t xmtcarrier;
+  size_t xmtcompressed;
+
+  old = current;
   std::string current_interface;
   // Declare a file stream, for reading /proc/net/dev.
   std::ifstream filestr("/proc/net/dev", std::fstream::in);
@@ -48,14 +66,21 @@ int get_network_state(const std::string& interface, net_state* state)
 
   if(!filestr) return -1; // Couldn't find interface
 
-  // Load the new data from the stream into the variables
-  if(state != NULL)
-    filestr >> state->rcvbytes >> state->rcvpackets >> state->rcverrs
-            >> state->rcvdrop >> state->rcvfifo >> state->rcvframe
-            >> state->rcvcompressed >> state->rcvmulticast
-            >> state->xmtbytes >> state->xmtpackets >> state->xmterrs
-            >> state->xmtdrop >> state->xmtfifo >> state->xmtcolls
-            >> state->xmtcarrier >> state->xmtcompressed;
+    // Load the new data from the stream into the variables
+  filestr >> current.rcvbytes >> current.rcvpackets >> rcverrs
+          >> rcvdrop >> rcvfifo >> rcvframe
+          >> rcvcompressed >> rcvmulticast
+          >> current.xmtbytes >> current.xmtpackets >> xmterrs
+          >> xmtdrop >> xmtfifo >> xmtcolls
+          >> xmtcarrier >> xmtcompressed;
+
+  if (state != NULL) {
+    state->rcvbytes = current.rcvbytes - old.rcvbytes;
+    state->xmtbytes = current.xmtbytes - old.xmtbytes;
+    state->rcvpackets = current.rcvpackets - old.rcvpackets;
+    state->xmtpackets = current.xmtpackets - old.xmtpackets;
+    state->type = DATA_UNKNOWN;
+  }
 
   return (!!filestr ? 0 : -1);
 }
