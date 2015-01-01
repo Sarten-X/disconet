@@ -35,6 +35,8 @@ struct runtime_options {
   std::string interface;
 };
 
+int terminate(int reason);
+
 extern int get_network_state(const std::string& interface, net_state* state);
 
 extern int initialize_pcap(const std::string& interface);

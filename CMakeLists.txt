@@ -52,7 +52,9 @@ include_directories(${PROJECT_BINARY_DIR})  # For config.h
 configure_file(config.h.in config.h)
 
 set(disconet_SRCS
-  disconet.cpp)
+  disconet.cpp
+  Output.cpp
+  )
 
 # Check for net/if_dl.h on bsd
 check_include_files(net/if_dl.h HAVE_IFDL_H)

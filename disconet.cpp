@@ -4,6 +4,7 @@
 #include "config.h"   // This is generated in build/config.h from <src>/config.h.in by cmake
 #include "disconet.h"
 #include "drawing.h"
+#include "Output.h"
 
 #include <iostream>
 #include <sstream>
@@ -15,6 +16,7 @@
 void loop (runtime_options options);
 
 int exit_status = 0;
+Output* output;
 
 int main(int argc, char* argv[])
 {
@@ -74,14 +76,15 @@ int main(int argc, char* argv[])
     #endif  // HAVE_PCAP
   }
 
-  std::cout << "Initializing ncurses" << std::endl;
-  initialize_drawing();
+  std::cout << "Initializing output" << std::endl;
+  output = new CursesOutput();
+  output->initialize_drawing();
   // All configuration is done.
   std::cout << "Starting monitoring" << std::endl;
   loop(options);
 
   std::cout << "Cleaning up" << std::endl;
-  uninitialize_drawing();
+  output->uninitialize_drawing();
   return exit_status;
 }
 
@@ -134,9 +137,9 @@ void loop (runtime_options options)
 
     // Begin calculations
     //std::cout << current.rcvbytes << " " << current.rcvpackets << " " << current.xmtbytes << " " << current.xmtpackets << "\r" << std::endl;
-    paint_drawing(packets, states, options.xscale, options.yscale);
+    output->paint_drawing(packets, states, options.xscale, options.yscale);
 
-    refresh_drawing();
+    output->refresh_drawing();
 
     gettimeofday(&end_time, NULL);
     long int usec = REFRESH_TIME - (((end_time.tv_sec - start_time.tv_sec) * 1000000 + end_time.tv_usec) - start_time.tv_usec);
