@@ -19,7 +19,6 @@
 
 #include <string>
 #include <map>
-#include <iostream>
 
 namespace {   // Force internal linkage
   template<typename Base, typename Derived, typename Key = std::string>
@@ -57,7 +56,6 @@ public:
   template<typename Derived>
   static bool load(const Key& key, FactoryFunc func = 0) {
     if(!func) func = PluginFactory<Base, Derived>::build;
-    std::cout << "Loading " << key <<' '<<&(factoryMap())<<std::endl;
     // Insert it, but don't overwrite
     // TODO: Warn of conflicts
     return !(factoryMap().insert(typename FactoryMap::value_type(key, func)).second);
