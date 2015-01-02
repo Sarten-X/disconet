@@ -106,7 +106,7 @@ void loop (runtime_options options)
         break;
       #endif // HAVE_PCAP
     } else {
-      if(get_network_state(options.interface, &current) != 0)
+      if(get_network_state(options.interface, &states) != 0)
         break;
     }
 

@@ -11,9 +11,13 @@
 #include <sys/sysctl.h>
 #include "disconet.h"
 
-int get_network_state(const std::string& interface, net_state* state)
+int get_network_state(const std::string& interface, StateMap* states)
 {
-  return get_BSD_stats(state, interface.c_str());
+  net_state state;
+  int ret = get_BSD_stats(&state, interface.c_str());
+  state.type = DATA_UNKNOWN;
+  if(states) (*states)[state.type] = state;
+  return ret;
 }
 
 static int get_BSD_stats(net_state* out, const char* interface)
@@ -65,12 +69,10 @@ static int get_BSD_stats(net_state* out, const char* interface)
       /*printf("%s %10lu %10lu %10lu %10lu\n", sdl->sdl_data,
       	ifd->ifi_ibytes, ifd->ifi_ipackets,
       	ifd->ifi_obytes, ifd->ifi_opackets);*/
-      if(out != NULL) {
-        out->rcvbytes = ifd->ifi_ibytes;
-        out->rcvpackets = ifd->ifi_ipackets;
-        out->xmtbytes = ifd->ifi_obytes;
-        out->xmtpackets = ifd->ifi_opackets;
-      }
+      out->rcvbytes = ifd->ifi_ibytes;
+      out->rcvpackets = ifd->ifi_ipackets;
+      out->xmtbytes = ifd->ifi_obytes;
+      out->xmtpackets = ifd->ifi_opackets;
       free(buf);
       return 0;
     }

@@ -24,7 +24,7 @@ Inter-|   Receive                                                |  Transmit
 
 */
 
-int get_network_state(const std::string& interface, net_state* state)
+int get_network_state(const std::string& interface, StateMap* states)
 {
   // dummy variables
   size_t rcverrs;
@@ -74,12 +74,14 @@ int get_network_state(const std::string& interface, net_state* state)
           >> xmtdrop >> xmtfifo >> xmtcolls
           >> xmtcarrier >> xmtcompressed;
 
-  if (state != NULL) {
-    state->rcvbytes = current.rcvbytes - old.rcvbytes;
-    state->xmtbytes = current.xmtbytes - old.xmtbytes;
-    state->rcvpackets = current.rcvpackets - old.rcvpackets;
-    state->xmtpackets = current.xmtpackets - old.xmtpackets;
-    state->type = DATA_UNKNOWN;
+  if (states != NULL) {
+    net_state state;
+    state.rcvbytes = current.rcvbytes - old.rcvbytes;
+    state.xmtbytes = current.xmtbytes - old.xmtbytes;
+    state.rcvpackets = current.rcvpackets - old.rcvpackets;
+    state.xmtpackets = current.xmtpackets - old.xmtpackets;
+    state.type = DATA_UNKNOWN;
+    (*states)[state.type] = state;
   }
 
   return (!!filestr ? 0 : -1);

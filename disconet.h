@@ -37,7 +37,9 @@ struct runtime_options {
 
 int terminate(int reason);
 
-extern int get_network_state(const std::string& interface, net_state* state);
+typedef std::map<dataType_t, net_state> StateMap;
+
+extern int get_network_state(const std::string& interface, StateMap* states);
 
 extern int initialize_pcap(const std::string& interface);
 extern int get_pcap_network_state(net_state* state);
