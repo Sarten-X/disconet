@@ -131,3 +131,4 @@ void CursesOutput::create_box(int y, int x, int w, int h)
     }
   }
 
+REGISTER_PLUGIN(Output, CursesOutput)
