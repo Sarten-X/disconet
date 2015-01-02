@@ -102,7 +102,7 @@ void loop (runtime_options options)
     std::map<dataType_t, net_state> states;
     if (options.profile) {
       #ifdef HAVE_PCAP
-      if(get_pcap_network_state(&current) != 0)
+      if(get_pcap_network_state(&states) != 0)
         break;
       #endif // HAVE_PCAP
     } else {
@@ -111,7 +111,7 @@ void loop (runtime_options options)
     }
 
     // This belongs in the source routine. Sources should return this map.
-    states[current.type] = current;
+    //states[current.type] = current;
 
     // Expand the map of network data into a vector of representative objects.
     // Each object represents a "typical" packet of a specific data type, scaled

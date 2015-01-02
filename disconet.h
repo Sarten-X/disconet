@@ -26,6 +26,12 @@ struct net_state {
   size_t xmtpackets;
 
   dataType_t type;
+  net_state() {
+    rcvbytes = 0;
+    rcvpackets = 0;
+    xmtbytes = 0;
+    xmtpackets = 0;
+  }
 };
 
 struct runtime_options {
@@ -42,5 +48,5 @@ typedef std::map<dataType_t, net_state> StateMap;
 extern int get_network_state(const std::string& interface, StateMap* states);
 
 extern int initialize_pcap(const std::string& interface);
-extern int get_pcap_network_state(net_state* state);
+extern int get_pcap_network_state(StateMap* state);
 #endif // __DISCONET_H__

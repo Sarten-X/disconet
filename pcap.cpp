@@ -16,7 +16,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-//#include <unordered_map>
+#include <map>
 #include <netinet/in.h>   // ntoh*
 #include <net/ethernet.h> // struct ether_header
 #include <netinet/tcp.h>  // struct tcphdr
@@ -42,6 +42,7 @@ public:
     setFilter(inhandle, filter, in_fp);
     setFilter(outhandle, filter, out_fp);
   }
+
   ~PCAPHandler()
   {
     if(inhandle) pcap_close(inhandle);
@@ -49,77 +50,36 @@ public:
     pcap_freecode(&in_fp);
     pcap_freecode(&out_fp);
   }
-  int get_network_state(net_state* state)
+
+  int get_network_state(StateMap* return_states)
   {
-    // TODO: replace "state" with "this" so we can encapsulate a std::map of a
-    // bunch of states, segregating data with context (maybe by port numbers)
-    pcap_dispatch(inhandle, -1, PCAPHandler::got_packet_rcv, (u_char*)state);
-    pcap_dispatch(outhandle, -1, PCAPHandler::got_packet_xmt, (u_char*)state);
+    pcap_dispatch(inhandle, -1, PCAPHandler::got_packet_rcv, (u_char*)return_states);
+    pcap_dispatch(outhandle, -1, PCAPHandler::got_packet_xmt, (u_char*)return_states);
     return 0;
   }
 
 private:
-  void setFilter(pcap_t* hdl, const std::string& filter, struct bpf_program& fp)
-  {
+
+  void setFilter(pcap_t* hdl, const std::string& filter, struct bpf_program& fp) {
     if(pcap_compile(hdl, &fp, filter.c_str(), 0, PCAP_NETMASK_UNKNOWN) == -1)
       throw std::runtime_error(pcap_geterr(hdl));
     if(pcap_setfilter(hdl, &fp) == -1)
       throw std::runtime_error(pcap_geterr(hdl));
   }
 
-  static void got_packet_rcv(u_char* user, const struct pcap_pkthdr* h, const u_char* bytes)
-  {
-    // TODO: Seperate this out, handle specific transports, etc in different functions.
-    net_state* state = (net_state*)user;
-    const uint8_t* data = bytes;
-    const struct ether_header* ether = (const struct ether_header*)data;
-    const struct ip* ip_ptr = (const struct ip*)(data += sizeof(struct ether_header));
-    // Use caplen, as that is the size of the allocated packet.  len is what it
-    // would have been had we captured everything (result of timing out, etc)
-    if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
-    data += ip_ptr->ip_hl * 4;
-    if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
-    switch(ip_ptr->ip_p) {
-    case IPPROTO_TCP: {
-      const struct tcphdr* tcp = (const struct tcphdr*)(data);
-      data += tcp->doff * 4;
-      if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
-      uint32_t len = h->caplen - (data - bytes);
-      // Now we have the entire stack for a TCP packet, up to and including the payload
-      switch(ntohs(tcp->source)) {  // Remember endianess, use ntoh[sl]
-      case 22:
-        state->type = DATA_SSH;
-        break;
-      case 80:
-      case 443:
-        state->type = DATA_HTTP;
-        break;
-      // TODO: Add more application protocols here.
-      default:
-        break;
-      }
-    }
-    break;
-    case IPPROTO_UDP: {
-      const struct udphdr* udp = (const struct udphdr*)(data);
-      data += sizeof(struct udphdr);
-      if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
-      uint32_t len = h->caplen - (data - bytes);
-      // Now we have the entire stack for a UDP packet, up to and including the payload
-    }
-    break;
-    // TODO: Other transport protocols here (defined in netinet/in.h)
-    default:
-      return;
-    }
-
-    ++state->rcvpackets;
-    state->rcvbytes += h->len;
+  static void got_packet_rcv(u_char* user, const struct pcap_pkthdr* h, const u_char* bytes) {
+    StateMap* states = (StateMap*)user;
+    process_packet(states, h, bytes, PCAP_D_IN);
   }
 
-  static void got_packet_xmt(u_char* user, const struct pcap_pkthdr* h, const u_char* bytes)
-  {
-    net_state* state = (net_state*)user;
+  static void got_packet_xmt(u_char* user, const struct pcap_pkthdr* h, const u_char* bytes) {
+    StateMap* states = (StateMap*)user;
+    process_packet(states, h, bytes, PCAP_D_OUT);
+  }
+
+  static void process_packet (StateMap* states, const struct pcap_pkthdr* h, const u_char* bytes, int direction) {
+    net_state current;
+    current.type = DATA_UNKNOWN;
     const uint8_t* data = bytes;
     const struct ether_header* ether = (const struct ether_header*)data;
     const struct ip* ip_ptr = (const struct ip*)(data += sizeof(struct ether_header));
@@ -129,23 +89,30 @@ private:
     data += ip_ptr->ip_hl * 4;
     if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
     switch(ip_ptr->ip_p) {
-    case IPPROTO_TCP: {
-      const struct tcphdr* tcp = (const struct tcphdr*)(data);
-      data += tcp->doff * 4;
-      if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
-      uint32_t len = h->caplen - (data - bytes);
-      // Now we have the entire stack for a TCP packet, up to and including the payload
-      switch(ntohs(tcp->dest)) {  // Remember endianess, use ntoh[sl]
-      case 22:
-        state->type = DATA_SSH;
-        break;
-      case 80:
-      case 443:
-        state->type = DATA_HTTP;
-        break;
-      // TODO: Add more application protocols here.
-      default:
-        break;
+      case IPPROTO_TCP: {
+        const struct tcphdr* tcp = (const struct tcphdr*)(data);
+        data += tcp->doff * 4;
+        if((bytes + h->caplen) < data) return;  // Didn't get the entire packet
+        uint32_t len = h->caplen - (data - bytes);
+        // Now we have the entire stack for a TCP packet, up to and including the payload
+        uint16_t target_address;
+        if (direction == PCAP_D_IN) {
+          target_address = tcp->dest;
+        } else if (direction == PCAP_D_OUT) {
+          target_address = tcp->source;
+        }
+
+        switch(ntohs(target_address)) {
+          case 22:
+            current.type = DATA_SSH;
+            break;
+          case 80:
+          case 443:
+            current.type = DATA_HTTP;
+            break;
+          // TODO: Add more application protocols here.
+          default:
+            break;
       }
     }
     break;
@@ -162,8 +129,14 @@ private:
       return;
     }
 
-    ++state->xmtpackets;
-    state->xmtbytes += h->len;
+    net_state& old_state = (*states)[current.type];
+    if (direction == PCAP_D_IN) {
+      old_state.rcvbytes += h->len;
+      ++old_state.xmtpackets;
+    } else if (direction == PCAP_D_OUT) {
+      old_state.xmtbytes += h->len;
+      ++old_state.xmtpackets;
+    }
   }
 
   pcap_t* inhandle;
@@ -174,10 +147,10 @@ private:
 
 static std::auto_ptr<PCAPHandler> handler;
 
-int get_pcap_network_state(net_state* state)
+int get_pcap_network_state(StateMap* states)
 {
   if(handler.get() == NULL) return -1;
-  handler->get_network_state(state);
+  handler->get_network_state(states);
   return 0;
 }
 
