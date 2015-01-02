@@ -9,9 +9,11 @@
 #include <net/route.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
-#include "disconet.h"
 
-int get_network_state(const std::string& interface, StateMap* states)
+#include "DefaultSource.h"
+#include "plugin_builder.h"
+
+int DefaultSource::get_network_state(const std::string& interface, StateMap* states)
 {
   net_state state;
   int ret = get_BSD_stats(&state, interface.c_str());
@@ -80,3 +82,5 @@ static int get_BSD_stats(net_state* out, const char* interface)
   free(buf);
   return -2;  // Couldn't find interface
 }
+
+REGISTER_PLUGIN(Source, DefaultOutput)

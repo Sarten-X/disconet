@@ -53,7 +53,6 @@ configure_file(config.h.in config.h)
 
 set(disconet_SRCS
   disconet.cpp
-  Output.cpp
   )
 
 # Check for net/if_dl.h on bsd

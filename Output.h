@@ -10,8 +10,8 @@
 class Output
 {
   public:
-    Output();
-    virtual ~Output();
+    Output() {}
+    virtual ~Output() {}
 
     virtual void initialize_drawing() = 0;
     virtual void uninitialize_drawing() = 0;

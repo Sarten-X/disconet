@@ -1,9 +1,8 @@
 #include <string>
 #include <fstream>
 
-#include "disconet.h"
-
-net_state current, old;
+#include "DefaultSource.h"
+#include "plugin_builder.h"
 
 static void trim(std::string& s)
 {
@@ -24,7 +23,7 @@ Inter-|   Receive                                                |  Transmit
 
 */
 
-int get_network_state(const std::string& interface, StateMap* states)
+int DefaultSource::get_network_state(const std::string& interface, StateMap* states)
 {
   // dummy variables
   size_t rcverrs;
@@ -86,3 +85,5 @@ int get_network_state(const std::string& interface, StateMap* states)
 
   return (!!filestr ? 0 : -1);
 }
+
+REGISTER_PLUGIN(Source, DefaultSource)

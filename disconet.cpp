@@ -3,8 +3,8 @@
 \************************************/
 #include "config.h"   // This is generated in build/config.h from <src>/config.h.in by cmake
 #include "disconet.h"
-#include "drawing.h"
 #include "Output.h"
+#include "Source.h"
 
 #include <iostream>
 #include <sstream>
@@ -13,10 +13,11 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-void loop (runtime_options options);
+INIT_PLUGIN_BUILDER
+
+void loop (runtime_options options, Source* src, Output* output);
 
 int exit_status = 0;
-Output* output;
 
 int main(int argc, char* argv[])
 {
@@ -28,6 +29,7 @@ int main(int argc, char* argv[])
   options.yscale = 1;
 
   int option;
+  Source* src = NULL;
 
   opterr = 0;
   while ((option = getopt (argc, argv, "h:w:i:p")) != -1) switch (option) {
@@ -44,7 +46,7 @@ int main(int argc, char* argv[])
       options.profile = true;
       break;
     default:
-      std::cerr << "Usage: " << argv[0] << "-i <interface> [-w xscale] [-h yscale] [-p]" << std::endl;
+      std::cerr << "Usage: " << argv[0] << "-i <interface> [-s source] [-w xscale] [-h yscale] [-p]" << std::endl;
       exit(1);
   }
 
@@ -53,42 +55,39 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
+  if (options.profile) {
+    std::vector<std::string> kinds = Source::kinds();
+    if(std::find(kinds.begin(), kinds.end(), "PcapSource") != kinds.end())
+      src = Source::create("PcapSource");
+    else {
+      std::cerr << "pcap source not available" << std::endl;
+      return -1;
+    }
+  }
+  if (src == NULL)
+    src = Source::create("DefaultSource");
 
   std::cout << "Finding network interface" << std::endl;
   // Attempt to get network statistics
-  if (get_network_state(options.interface, NULL) != 0) {
+  if (src->get_network_state(options.interface, NULL) != 0) {
     // Couldn't find the interface, exit "gracefully"
     std::cerr << "Failed to find interface \"" << options.interface << "\"" << std::endl;
     return -1;
   }
 
-  if (options.profile) {
-    #ifdef HAVE_PCAP
-    std::cout << "Initializing pcap" << std::endl;
-    if (initialize_pcap(options.interface) != 0) {
-      // Couldn't find the interface, exit "gracefully"
-      std::cerr << "Failed to initialize pcap for \"" << options.interface << "\"" << std::endl;
-      return -1;
-    }
-    #else
-    std::cerr << "Not compiled with libpcap support. Profiling not available." << std::endl;
-    return -1;
-    #endif  // HAVE_PCAP
-  }
-
   std::cout << "Initializing output" << std::endl;
-  output = new CursesOutput();
+  Output* output = Output::create("CursesOutput");
   output->initialize_drawing();
   // All configuration is done.
   std::cout << "Starting monitoring" << std::endl;
-  loop(options);
+  loop(options, src, output);
 
   std::cout << "Cleaning up" << std::endl;
   output->uninitialize_drawing();
   return exit_status;
 }
 
-void loop (runtime_options options)
+void loop (runtime_options options, Source* src, Output* output)
 {
   timeval start_time, end_time;
 
@@ -100,15 +99,8 @@ void loop (runtime_options options)
 
 
     std::map<dataType_t, net_state> states;
-    if (options.profile) {
-      #ifdef HAVE_PCAP
-      if(get_pcap_network_state(&states) != 0)
-        break;
-      #endif // HAVE_PCAP
-    } else {
-      if(get_network_state(options.interface, &states) != 0)
-        break;
-    }
+    if(src->get_network_state(options.interface, &states) != 0)
+      break;
 
     // This belongs in the source routine. Sources should return this map.
     //states[current.type] = current;

@@ -45,8 +45,4 @@ int terminate(int reason);
 
 typedef std::map<dataType_t, net_state> StateMap;
 
-extern int get_network_state(const std::string& interface, StateMap* states);
-
-extern int initialize_pcap(const std::string& interface);
-extern int get_pcap_network_state(StateMap* state);
 #endif // __DISCONET_H__

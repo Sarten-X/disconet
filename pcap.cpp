@@ -1,5 +1,6 @@
-#include "disconet.h"
+#include "PcapSource.h"
 #include "config.h"
+#include "plugin_builder.h"
 
 #ifndef HAVE_PCAP
 #error "Should not be compiling this, as pcap was not found."
@@ -23,10 +24,10 @@
 #include <netinet/udp.h>  // struct udphdr
 #include <netinet/ip.h>   // struct ip
 
-class PCAPHandler
+class PcapPimpl
 {
 public:
-  PCAPHandler(const std::string& dev, const std::string& filter = std::string(""))
+  PcapPimpl(const std::string& dev, const std::string& filter = std::string(""))
   {
     char errbuf[PCAP_ERRBUF_SIZE];
     inhandle =  pcap_open_live(dev.c_str(), BUFSIZ, 1, 1000, errbuf);
@@ -43,7 +44,7 @@ public:
     setFilter(outhandle, filter, out_fp);
   }
 
-  ~PCAPHandler()
+  ~PcapPimpl()
   {
     if(inhandle) pcap_close(inhandle);
     if(outhandle) pcap_close(outhandle);
@@ -53,8 +54,8 @@ public:
 
   int get_network_state(StateMap* return_states)
   {
-    pcap_dispatch(inhandle, -1, PCAPHandler::got_packet_rcv, (u_char*)return_states);
-    pcap_dispatch(outhandle, -1, PCAPHandler::got_packet_xmt, (u_char*)return_states);
+    pcap_dispatch(inhandle, -1, PcapPimpl::got_packet_rcv, (u_char*)return_states);
+    pcap_dispatch(outhandle, -1, PcapPimpl::got_packet_xmt, (u_char*)return_states);
     return 0;
   }
 
@@ -145,22 +146,32 @@ private:
   // to be per-handle.
 };
 
-static std::auto_ptr<PCAPHandler> handler;
+PcapSource::PcapSource() : pimpl(NULL) {}
 
-int get_pcap_network_state(StateMap* states)
-{
-  if(handler.get() == NULL) return -1;
-  handler->get_network_state(states);
-  return 0;
-}
-
-int initialize_pcap(const std::string& interface)
-{
-  try {
-    handler.reset(new PCAPHandler(interface));
-  } catch(const std::runtime_error& e) {
-    std::cerr << "Failed to initialize pcap " << e.what() << std::endl;
-    return -1;
+PcapSource::~PcapSource() {
+  if(pimpl) {
+    delete pimpl;
+    pimpl = NULL;
   }
+}
+
+int PcapSource::get_network_state(const std::string& itfc, StateMap* states)
+{
+  if(this->itfc != itfc)
+  {
+    if(pimpl) {
+      delete pimpl;
+      pimpl = NULL;
+    }
+    try {
+      pimpl = new PcapPimpl(itfc);
+    } catch(const std::runtime_error& e) {
+      std::cerr << "Failed to initialize pcap " << e.what() << std::endl;
+      return -1;
+    }
+  }
+  pimpl->get_network_state(states);
   return 0;
 }
+
+REGISTER_PLUGIN(Source, PcapSource)
