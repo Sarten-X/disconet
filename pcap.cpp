@@ -170,7 +170,8 @@ int PcapSource::get_network_state(const std::string& itfc, StateMap* states)
       return -1;
     }
   }
-  pimpl->get_network_state(states);
+  if(states)
+    pimpl->get_network_state(states);
   return 0;
 }
 
